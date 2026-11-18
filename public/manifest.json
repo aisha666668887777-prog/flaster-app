@@ -1,0 +1,35 @@
+{
+  "id": "/",
+  "name": "Flaster • فلاستر - استمتع بالأفضل ووفر الأكثر",
+  "short_name": "Flaster",
+  "description": "فلاستر (Flaster): استمتع بالأفضل ووفر الأكثر — احصل على أشهى وجبات ومخبوزات أفضل مطاعم وكافيهات رأس الخيمة طازجة يومياً بخصم يصل إلى 70%.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#ee5253",
+  "background_color": "#FAF7F2",
+  "categories": ["food", "shopping", "lifestyle"],
+  "icons": [
+    {
+      "src": "/pwa-192x192.png?v=2",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png?v=2",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png?v=2",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "maskable"
+    }
+  ]
+}

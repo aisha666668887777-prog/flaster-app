@@ -1,0 +1,352 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Primitive Security Helpers
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-+]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == 'aisha666668887777@gmail.com' && request.auth.token.email_verified == true) ||
+        request.auth.token.role in ['super_admin', 'ops_admin', 'founder_admin'] ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isMerchantFor(merchantId) {
+      return isSignedIn() &&
+        request.auth.token.role == 'merchant' &&
+        request.auth.token.merchantId == merchantId;
+    }
+
+    function isMerchantDocOwner(merchantId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/merchants_private/$(merchantId)) &&
+        get(/databases/$(database)/documents/merchants_private/$(merchantId)).data.ownerUid == request.auth.uid;
+    }
+
+    // 3. Entity Validation Helpers (Anti-Update-Gap)
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'name', 'phone', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'name', 'phone', 'email', 'loyaltyPoints', 'welcomeBonusClaimed', 'completedOrdersCount', 'savedAddresses', 'createdAt', 'updatedAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
+        data.phone is string && data.phone.size() >= 4 && data.phone.size() <= 32 &&
+        (!('email' in data) || (data.email is string && data.email.size() <= 200)) &&
+        (!('loyaltyPoints' in data) || (data.loyaltyPoints is int && data.loyaltyPoints >= 0)) &&
+        (!('welcomeBonusClaimed' in data) || (data.welcomeBonusClaimed is bool)) &&
+        (!('completedOrdersCount' in data) || (data.completedOrdersCount is int && data.completedOrdersCount >= 0)) &&
+        (!('savedAddresses' in data) || (data.savedAddresses is list && data.savedAddresses.size() <= 10)) &&
+        data.createdAt is string && data.createdAt.size() <= 64 &&
+        data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    function isValidWallet(data) {
+      return data.keys().hasAll(['customerId', 'availablePoints', 'welcomeBonusClaimed', 'updatedAt']) &&
+        data.keys().hasOnly(['customerId', 'availablePoints', 'totalEarnedPoints', 'totalRedeemedPoints', 'totalExpiredPoints', 'welcomeBonusClaimed', 'completedOrdersCount', 'updatedAt']) &&
+        data.customerId is string && data.customerId.size() >= 1 && data.customerId.size() <= 128 &&
+        data.availablePoints is int && data.availablePoints >= 0 &&
+        (!('totalEarnedPoints' in data) || (data.totalEarnedPoints is int && data.totalEarnedPoints >= 0)) &&
+        (!('totalRedeemedPoints' in data) || (data.totalRedeemedPoints is int && data.totalRedeemedPoints >= 0)) &&
+        (!('totalExpiredPoints' in data) || (data.totalExpiredPoints is int && data.totalExpiredPoints >= 0)) &&
+        data.welcomeBonusClaimed is bool &&
+        (!('completedOrdersCount' in data) || (data.completedOrdersCount is int && data.completedOrdersCount >= 0)) &&
+        data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll(['id', 'customerId', 'merchantId', 'totalFils', 'status', 'fulfillmentType', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'id', 'code', 'invoiceNumber', 'customerId', 'customerName', 'customerPhone', 'deliveryAddress',
+          'merchantId', 'items', 'itemSnapshot', 'subtotalFils', 'deliveryFeeFils',
+          'platformCommissionFils', 'merchantEarningsFils', 'pointsDiscountFils', 'pointsRedeemed',
+          'platformLoyaltyExpenseFils', 'vatFils', 'totalFils', 'status', 'workflowStatus',
+          'fulfillmentType', 'paymentMethod', 'paymentStatus', 'paymentTransactionId', 'paymentGateway',
+          'refundStatus', 'refundReason', 'refundedAt', 'merchantNotes', 'cancellationReason',
+          'completedAt', 'verifiedBy', 'pickupCode', 'pickupCodeHash', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 &&
+        data.customerId is string && data.customerId.size() >= 1 && data.customerId.size() <= 128 &&
+        data.merchantId is string && data.merchantId.size() >= 1 && data.merchantId.size() <= 128 &&
+        data.totalFils is int && data.totalFils >= 0 &&
+        (!('subtotalFils' in data) || (data.subtotalFils is int && data.subtotalFils >= 0)) &&
+        (!('deliveryFeeFils' in data) || (data.deliveryFeeFils is int && data.deliveryFeeFils == 0)) &&
+        (!('pointsDiscountFils' in data) || (data.pointsDiscountFils is int && data.pointsDiscountFils >= 0)) &&
+        (!('pointsRedeemed' in data) || (data.pointsRedeemed is int && data.pointsRedeemed >= 0)) &&
+        (!('vatFils' in data) || (data.vatFils is int && data.vatFils >= 0)) &&
+        data.status in ['placed', 'accepted', 'preparing', 'ready', 'ready_for_pickup', 'picked_up', 'out_for_delivery', 'delivered', 'completed', 'cancelled'] &&
+        (!('workflowStatus' in data) || data.workflowStatus in ['placed', 'accepted', 'preparing', 'ready', 'ready_for_pickup', 'picked_up', 'out_for_delivery', 'delivered', 'completed', 'cancelled']) &&
+        data.fulfillmentType in ['pickup', 'delivery'] &&
+        (!('paymentStatus' in data) || data.paymentStatus in ['paid', 'pending_cash', 'pending', 'sandbox_paid', 'failed', 'refunded']) &&
+        (!('refundStatus' in data) || data.refundStatus in ['none', 'requested', 'refunded', 'rejected']) &&
+        data.createdAt is string && data.createdAt.size() <= 64 &&
+        data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    function isValidSurplusItem(data) {
+      return data.keys().hasAll(['id', 'merchantId', 'titleEn', 'titleAr', 'originalPriceFils', 'discountedPriceFils', 'stockRemaining', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'id', 'merchantId', 'merchantName', 'merchantNameAr', 'titleEn', 'titleAr',
+          'descriptionEn', 'descriptionAr', 'category', 'imageUrl', 'originalPriceFils',
+          'discountedPriceFils', 'initialStock', 'stockRemaining', 'pickupStart', 'pickupEnd',
+          'pickupDate', 'expiryTime', 'allergens', 'ingredients', 'isHalal', 'co2SavedKg',
+          'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 &&
+        data.merchantId is string && data.merchantId.size() >= 1 && data.merchantId.size() <= 128 &&
+        data.titleEn is string && data.titleEn.size() >= 1 && data.titleEn.size() <= 200 &&
+        data.titleAr is string && data.titleAr.size() >= 1 && data.titleAr.size() <= 200 &&
+        data.originalPriceFils is int && data.originalPriceFils >= 0 &&
+        data.discountedPriceFils is int && data.discountedPriceFils >= 0 &&
+        data.discountedPriceFils <= data.originalPriceFils &&
+        data.stockRemaining is int && data.stockRemaining >= 0 &&
+        (!('expiryTime' in data) || (data.expiryTime is string && data.expiryTime.size() <= 64)) &&
+        (!('allergens' in data) || (data.allergens is string && data.allergens.size() <= 500)) &&
+        (!('ingredients' in data) || (data.ingredients is string && data.ingredients.size() <= 1000)) &&
+        data.status in ['active', 'sold_out', 'paused', 'expired'] &&
+        data.createdAt is string && data.createdAt.size() <= 64 &&
+        data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    function isValidMerchant(data) {
+      return data.keys().hasAll(['id', 'name', 'nameAr', 'commissionPercent', 'isVerified', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'id', 'name', 'nameAr', 'category', 'neighborhood', 'neighborhoodAr',
+          'commissionPercent', 'isVerified', 'totalSalesFils', 'totalSalesAed',
+          'activeListingsCount', 'rating', 'phone', 'iban', 'lat', 'lng',
+          'address', 'addressAr', 'avatar', 'updatedAt'
+        ]) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 160 &&
+        data.nameAr is string && data.nameAr.size() >= 1 && data.nameAr.size() <= 160 &&
+        data.commissionPercent is number && data.commissionPercent >= 0 && data.commissionPercent <= 50 &&
+        data.isVerified is bool &&
+        data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    function isValidCommissionLog(data) {
+      return data.keys().hasAll(['id', 'merchantId', 'changedBy', 'oldValue', 'newValue', 'timestamp']) &&
+        data.keys().hasOnly(['id', 'merchantId', 'merchantName', 'changedBy', 'oldValue', 'newValue', 'timestamp', 'changedAt']) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 &&
+        data.merchantId is string && data.merchantId.size() >= 1 && data.merchantId.size() <= 128 &&
+        data.changedBy is string && data.changedBy.size() >= 1 && data.changedBy.size() <= 200 &&
+        data.oldValue is number && data.oldValue >= 0 && data.oldValue <= 50 &&
+        data.newValue is number && data.newValue >= 0 && data.newValue <= 50 &&
+        data.timestamp is string && data.timestamp.size() <= 64;
+    }
+
+    function isValidPlatformSetting(data) {
+      return data.keys().hasAll(['businessName', 'supportPhoneE164', 'defaultCommissionPercent', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'businessName', 'businessNameEn', 'businessNameAr', 'trn', 'supportPhoneE164',
+          'supportWhatsappDigits', 'supportEmail', 'vatRatePercent', 'defaultCommissionPercent',
+          'sequentialInvoiceCounter', 'updatedBy', 'updatedAt'
+        ]) &&
+        data.businessName is string && data.businessName.size() >= 1 && data.businessName.size() <= 120 &&
+        (!('trn' in data) || (data.trn is string && data.trn.size() <= 32)) &&
+        data.supportPhoneE164 is string && data.supportPhoneE164.size() >= 8 && data.supportPhoneE164.size() <= 32 &&
+        data.defaultCommissionPercent is number && data.defaultCommissionPercent >= 0 && data.defaultCommissionPercent <= 50 &&
+        data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    function isValidAdminRecord(data) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'role', 'createdAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 200 &&
+        data.role in ['super_admin', 'ops_admin'] &&
+        data.createdAt is string && data.createdAt.size() <= 64;
+    }
+
+    // 4. Collection Rules
+
+    // Users: Users can only read/write their own profile (zero self-granted points); Admins manage all
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isValidId(userId) && isOwner(userId) && isValidUser(incoming()) &&
+        incoming().uid == request.auth.uid &&
+        (!('loyaltyPoints' in incoming()) || incoming().loyaltyPoints == 0) &&
+        (!('welcomeBonusClaimed' in incoming()) || incoming().welcomeBonusClaimed == false) &&
+        (!('completedOrdersCount' in incoming()) || incoming().completedOrdersCount == 0);
+      allow update: if isValidId(userId) && isValidUser(incoming()) && (
+        isAdmin() ||
+        (isOwner(userId) &&
+         incoming().uid == existing().uid &&
+         incoming().createdAt == existing().createdAt &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'email', 'savedAddresses', 'updatedAt']))
+      );
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // Wallets: Users can only read their own wallet; strictly only server Admin SDK or Admins can mutate points
+    match /wallets/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(userId) && isAdmin() && isValidWallet(incoming());
+      allow update: if isValidId(userId) && isValidWallet(incoming()) && isAdmin();
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // Loyalty Transactions: Read own or Admin; write strictly server Admin SDK / Admin only
+    match /loyalty_transactions/{txnId} {
+      allow get: if isValidId(txnId) && isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // Orders:
+    // - Customer reads/creates/cancels ONLY their own orders (while 'placed') and cannot modify prices/points/status arbitrarily
+    // - Merchant reads/updates ONLY their restaurant's orders (merchantId match) and cannot tamper with prices/customerId/merchantId
+    // - Admins manage all orders
+    match /orders/{orderId} {
+      allow get: if isValidId(orderId) && isSignedIn() && (
+        resource.data.customerId == request.auth.uid ||
+        isMerchantFor(resource.data.merchantId) ||
+        isMerchantDocOwner(resource.data.merchantId) ||
+        isAdmin()
+      );
+      // Note: allow list avoids get()/exists() calls per Firestore rules best practices
+      allow list: if isSignedIn() && (
+        resource.data.customerId == request.auth.uid ||
+        isMerchantFor(resource.data.merchantId) ||
+        isAdmin()
+      );
+      allow create: if isValidId(orderId) && isSignedIn() && isValidOrder(incoming()) && (
+        isAdmin() ||
+        (incoming().customerId == request.auth.uid &&
+         incoming().status == 'placed' &&
+         (!('refundStatus' in incoming()) || incoming().refundStatus == 'none') &&
+         (!('pointsRedeemed' in incoming()) || incoming().pointsRedeemed == 0) &&
+         (!('pointsDiscountFils' in incoming()) || incoming().pointsDiscountFils == 0))
+      );
+      allow update: if isValidId(orderId) && isValidOrder(incoming()) && (
+        isAdmin() ||
+        // Customer: may only cancel their own order strictly before merchant acceptance ('placed')
+        (isSignedIn() &&
+         existing().customerId == request.auth.uid &&
+         existing().status == 'placed' &&
+         incoming().status == 'cancelled' &&
+         incoming().customerId == existing().customerId &&
+         incoming().merchantId == existing().merchantId &&
+         incoming().totalFils == existing().totalFils &&
+         incoming().subtotalFils == existing().subtotalFils &&
+         incoming().pointsDiscountFils == existing().pointsDiscountFils &&
+         incoming().createdAt == existing().createdAt &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'workflowStatus', 'refundStatus', 'refundReason', 'refundedAt', 'updatedAt'])) ||
+        // Merchant: may only advance workflow status for their own restaurant's non-terminal order
+        ((isMerchantFor(existing().merchantId) || isMerchantDocOwner(existing().merchantId)) &&
+         !(existing().status in ['completed', 'cancelled']) &&
+         incoming().customerId == existing().customerId &&
+         incoming().merchantId == existing().merchantId &&
+         incoming().totalFils == existing().totalFils &&
+         incoming().subtotalFils == existing().subtotalFils &&
+         incoming().pointsDiscountFils == existing().pointsDiscountFils &&
+         incoming().createdAt == existing().createdAt &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'workflowStatus', 'merchantNotes', 'completedAt', 'verifiedBy', 'updatedAt']))
+      );
+      allow delete: if isValidId(orderId) && isAdmin();
+    }
+
+    // Surplus Items: Publicly readable marketplace items; editable strictly by Admins or owning Merchant
+    match /surplus_items/{itemId} {
+      allow get: if isValidId(itemId);
+      allow list: if resource.data.status in ['active', 'sold_out', 'paused', 'expired'];
+      allow create: if isValidId(itemId) && isValidSurplusItem(incoming()) && (
+        isAdmin() ||
+        isMerchantFor(incoming().merchantId) ||
+        isMerchantDocOwner(incoming().merchantId)
+      );
+      allow update: if isValidId(itemId) && isValidSurplusItem(incoming()) && (
+        isAdmin() ||
+        ((isMerchantFor(existing().merchantId) || isMerchantDocOwner(existing().merchantId)) &&
+         incoming().merchantId == existing().merchantId &&
+         incoming().createdAt == existing().createdAt)
+      );
+      allow delete: if isValidId(itemId) && isAdmin();
+    }
+
+    // Merchants & Commissions: Strictly only Admins can create/delete or change commissions/verification
+    match /merchants/{merchantId} {
+      allow get: if isValidId(merchantId);
+      allow list: if resource.data.isVerified in [true, false];
+      allow create: if isValidId(merchantId) && isAdmin() && isValidMerchant(incoming());
+      allow update: if isValidId(merchantId) && isValidMerchant(incoming()) && isAdmin();
+      allow delete: if isValidId(merchantId) && isAdmin();
+    }
+
+    // Private Merchant Metadata (IBAN, Owner UID): Only owning Merchant or Admin
+    match /merchants_private/{merchantId} {
+      allow get: if isValidId(merchantId) && (isAdmin() || isMerchantFor(merchantId) || (isSignedIn() && resource.data.ownerUid == request.auth.uid));
+      allow list, write: if isAdmin();
+    }
+
+    // Commission Audit Logs: Strictly only Founders Admins can read/create; immutable once written
+    match /commission_logs/{logId} {
+      allow get: if isValidId(logId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(logId) && isAdmin() && isValidCommissionLog(incoming());
+      allow update, delete: if false;
+    }
+
+    // Refund Audit Logs: Strictly only Founders Admins can read; written only by server Admin SDK
+    match /refund_logs/{logId} {
+      allow get: if isValidId(logId) && isAdmin();
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    // Platform Settings (TRN, Support Phone, Default Commission): Readable by app, writable strictly by Admins
+    match /settings/{settingId} {
+      allow get: if isValidId(settingId);
+      allow list: if isAdmin();
+      allow create: if isValidId(settingId) && isAdmin() && isValidPlatformSetting(incoming());
+      allow update: if isValidId(settingId) && isValidPlatformSetting(incoming()) && isAdmin();
+      allow delete: if false;
+    }
+
+    // Admins Registry: Readable by signed-in user checking their own admin doc or Admins; writable strictly by Admins
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && (isOwner(adminId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isValidId(adminId) && isAdmin() && isValidAdminRecord(incoming());
+      allow update: if isValidId(adminId) && isValidAdminRecord(incoming()) && isAdmin();
+      allow delete: if isValidId(adminId) && isAdmin();
+    }
+
+    // Server-Only Security Collections (Never directly readable/writable from client browsers)
+    match /merchant_credentials/{docId} {
+      allow read, write: if false;
+    }
+
+    match /pickup_secrets/{docId} {
+      allow read, write: if false;
+    }
+
+    match /idempotency_keys/{docId} {
+      allow read, write: if false;
+    }
+  }
+}

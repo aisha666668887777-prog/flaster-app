@@ -1,0 +1,138 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@layer base {
+  :root {
+    --font-headline: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-condensed: 'Bebas Neue', 'Plus Jakarta Sans', sans-serif;
+    --font-metric: 'Space Grotesk', monospace;
+    --font-arabic: 'Cairo', system-ui, -apple-system, sans-serif;
+  }
+
+  [dir="rtl"] {
+    font-family: var(--font-arabic), system-ui, sans-serif;
+    line-height: 1.6;
+  }
+
+  [dir="ltr"] {
+    font-family: var(--font-body);
+  }
+}
+
+.font-headline {
+  font-family: var(--font-headline);
+}
+
+.font-condensed {
+  font-family: var(--font-condensed);
+  letter-spacing: 0.04em;
+}
+
+.font-metric {
+  font-family: var(--font-metric);
+}
+
+.font-arabic {
+  font-family: var(--font-arabic);
+}
+
+/* Custom elevation tokens from design specs */
+.shadow-elevation-1 {
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.03);
+}
+
+.shadow-elevation-2 {
+  box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.04), 0 4px 6px -4px rgba(15, 23, 42, 0.05);
+}
+
+.shadow-elevation-3 {
+  box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(226, 232, 240, 0.8);
+}
+
+.shadow-elevation-4 {
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.2);
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Prevent Tailwind base img styles from distorting Leaflet map tiles */
+.leaflet-container img.leaflet-tile {
+  max-width: none !important;
+  max-height: none !important;
+  width: 256px !important;
+  height: 256px !important;
+}
+
+/* Dark mode filter on standard OpenStreetMap tiles (zero API key needed) */
+.map-tiles-dark .leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
+
+.custom-flaster-pin-wrapper,
+.user-location-pin,
+.distance-midpoint-badge {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Prevent horizontal scroll without breaking iOS WebKit position:sticky hit-testing */
+html,
+body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+/* Standalone PWA Header Safe Area & Touch Target Fix */
+.pwa-safe-header {
+  padding-top: env(safe-area-inset-top, 0px);
+  box-sizing: border-box;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@media all and (display-mode: standalone) {
+  .pwa-safe-header {
+    padding-top: max(env(safe-area-inset-top, 0px), 10px);
+  }
+}
+
+.pwa-safe-drawer-top {
+  padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
+  box-sizing: border-box;
+}
+
+@media all and (display-mode: standalone) {
+  .pwa-safe-drawer-top {
+    padding-top: calc(1.25rem + max(env(safe-area-inset-top, 0px), 10px));
+  }
+}
+
+.pwa-touch-btn {
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+.pwa-touch-btn > svg {
+  pointer-events: none;
+}

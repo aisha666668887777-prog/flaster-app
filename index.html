@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ar" dir="rtl" class="max-w-full w-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="google-site-verification" content="_NxtvXy2N144Pku0U_L6kINRt5qOQHt13OHrfMo5jA0" />
+    <title>فلاستر | Flaster UAE - استمتع بالأفضل ووفر الأكثر</title>
+    <meta name="description" content="فلاستر (Flaster): استمتع بالأفضل ووفر الأكثر — وجبات ومخبوزات طازجة يومياً من أفضل مطاعم وكافيهات رأس الخيمة والإمارات بأسعار اقتصادية لا تُقاوم." />
+    <meta name="keywords" content="فلاستر, Flaster, flaster.ae, تطبيق فلاستر, Flaster UAE, مطاعم رأس الخيمة, وجبات مخفضة, عروض المطاعم, طعام طازج, طعام فاخر, توفير, Ras Al Khaimah food delivery" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Theme & Mobile Web App Meta Tags (iOS Safari & Android Chrome) -->
+    <meta name="theme-color" content="#FFFDF9" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Flaster" />
+    <meta name="application-name" content="Flaster" />
+    <meta name="format-detection" content="telephone=no" />
+    
+    <!-- iOS & Browser Icons (Official Flaster Logo) -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/pwa-192x192.png?v=2" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/pwa-512x512.png?v=2" />
+    <link rel="icon" type="image/jpeg" href="/flaster-app-icon.jpg?v=2" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png?v=2" />
+
+    <!-- OpenGraph Social Cards -->
+    <meta property="og:site_name" content="فلاستر | Flaster" />
+    <meta property="og:title" content="فلاستر | Flaster UAE - استمتع بالأفضل ووفر الأكثر" />
+    <meta property="og:description" content="فلاستر: استمتع بالأفضل ووفر الأكثر — وجبات فاخرة طازجة يومياً من أفضل مطاعم ومخابز رأس الخيمة بخصم 50% إلى 70%." />
+    <meta property="og:url" content="https://flaster.ae/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ar_AE" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:image" content="/assets/flaster-social-post.jpg" />
+    
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="فلاستر | Flaster UAE" />
+    <meta name="twitter:description" content="استمتع بالأفضل ووفر الأكثر — احصل على أشهى الوجبات الفاخرة في رأس الخيمة بخصم حتى 70% مع فلاستر." />
+    <meta name="twitter:image" content="/assets/flaster-social-post.jpg" />
+    
+    <!-- Schema.org JSON-LD Structured Data for Google Search -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "فلاستر | Flaster",
+      "alternateName": ["Flaster", "فلاستر", "Flaster UAE", "تطبيق فلاستر", "flaster.ae"],
+      "url": "https://flaster.ae",
+      "applicationCategory": "FoodAndDrinkApplication",
+      "operatingSystem": "All",
+      "inLanguage": ["ar", "en"],
+      "description": "منصة فلاستر الذكية لتوفير وجبات ومخبوزات المطاعم والكافيهات الفاخرة برأس الخيمة بخصم 50-70%.",
+      "areaServed": {
+        "@type": "AdministrativeArea",
+        "name": "Ras Al Khaimah, United Arab Emirates"
+      },
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "AED"
+      }
+    }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cairo:wght@400;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <style>
+      /* Hide any injected preview badges or watermarks */
+      iframe[src*="aistudio"], div[class*="aistudio"], div[id*="aistudio"], a[href*="aistudio"] {
+        display: none !important;
+      }
+
+      /* Red Velvet / Cake Palette (#B91D2D, #5C0101, #FFA29D, #FBF4D0, #E5C48D) */
+      .bg-\[\#DC2626\], [class*="bg-[#DC2626]"] { background-color: #B91D2D !important; }
+      .text-\[\#DC2626\], [class*="text-[#DC2626]"] { color: #B91D2D !important; }
+      .border-\[\#DC2626\], [class*="border-[#DC2626]"] { border-color: #B91D2D !important; }
+      .hover\:bg-\[\#B91C1C\]:hover, [class*="hover:bg-[#B91C1C]"]:hover { background-color: #5C0101 !important; }
+      .bg-amber-400, .bg-amber-500, .bg-amber-600 { background-color: #FFA29D !important; border-color: #e08b87 !important; color: #5C0101 !important; }
+      .bg-\[\#FAF7F2\] { background-color: #FBF4D0 !important; }
+    </style>
+    <script>
+      // Automatically strip out any floating AI Studio watermarks or preview badges
+      window.addEventListener('DOMContentLoaded', () => {
+        const observer = new MutationObserver((mutations) => {
+          document.querySelectorAll('div, span, a, iframe').forEach(el => {
+            const txt = (el.textContent || '').trim();
+            if ((txt.includes('AI Studio') || txt.includes('Google AI')) && (el.style.position === 'fixed' || el.style.position === 'absolute' || el.classList.value.includes('badge') || el.classList.value.includes('banner'))) {
+              el.remove();
+            }
+          });
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+      });
+    </script>
+  </head>
+  <body class="bg-[#FAF7F2] text-[#1C1917] antialiased selection:bg-[#DC2626] selection:text-white max-w-full w-full">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker
+            .register('/service-worker.js?v=4', { scope: '/' })
+            .then(function (reg) {
+              if (reg && typeof reg.update === 'function') {
+                reg.update();
+              }
+            })
+            .catch(function () {});
+        });
+      }
+    </script>
+  </body>
+</html>

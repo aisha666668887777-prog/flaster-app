@@ -1,0 +1,6 @@
+{
+  "name": "A&M Tawfeer - SMART SAVING. LESS WASTE.",
+  "description": "A&M Tawfeer: SMART SAVING. LESS WASTE. Warm culinary marketplace rescuing surplus gourmet food, artisan bakery items, and hotel buffet packs across Ras Al Khaimah and the UAE at 50-70% off.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
