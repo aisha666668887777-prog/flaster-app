@@ -87,12 +87,13 @@ async function runTests() {
   // -------------------------------------------------------------------------
   // 2. COMMISSION VALIDATION & AUDIT LOG TESTS
   // -------------------------------------------------------------------------
-  console.log('2) Testing Commission Validation (0–50%, non-negative) & Audit Logging...');
+  console.log('2) Testing Commission Validation (0–100%, non-negative) & Audit Logging...');
   assert.equal(validateCommissionRate(15).valid, true, '15% should be valid');
   assert.equal(validateCommissionRate(0).valid, true, '0% should be valid');
-  assert.equal(validateCommissionRate(50).valid, true, '50% should be valid');
+  assert.equal(validateCommissionRate(60).valid, true, '60% should be valid');
+  assert.equal(validateCommissionRate(100).valid, true, '100% should be valid');
   assert.equal(validateCommissionRate(-5).valid, false, 'Negative commission (-5%) must be rejected');
-  assert.equal(validateCommissionRate(55).valid, false, 'Commission > 50% (55%) must be rejected');
+  assert.equal(validateCommissionRate(105).valid, false, 'Commission > 100% (105%) must be rejected');
 
   const invalidNegResult = await updateMerchantCommissionRate({
     merchantId: 'm-zaatar',
@@ -103,10 +104,10 @@ async function runTests() {
 
   const invalidHighResult = await updateMerchantCommissionRate({
     merchantId: 'm-zaatar',
-    newCommissionPercent: 65,
+    newCommissionPercent: 105,
     changedBy: 'admin@test.ae',
   });
-  assert.equal(invalidHighResult.success, false, 'Server must reject >50% commission update');
+  assert.equal(invalidHighResult.success, false, 'Server must reject >100% commission update');
 
   const validUpdateResult = await updateMerchantCommissionRate({
     merchantId: 'm-zaatar',

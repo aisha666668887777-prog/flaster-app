@@ -328,11 +328,11 @@ export const AdminFoundersDashboard: React.FC<AdminFoundersDashboardProps> = ({
     }
   };
 
-  // Update default platform commission rate (Validated 0-50%, never negative)
+  // Update default platform commission rate (Validated 0-100%, never negative)
   const handleUpdateCommission = async (newRate: number) => {
     const validation = validateCommissionRate(newRate);
     if (!validation.valid) {
-      setCommissionError(validation.error || 'Commission rate must be between 0% and 50%.');
+      setCommissionError(validation.error || 'Commission rate must be between 0% and 100%.');
       setTimeout(() => setCommissionError(null), 4000);
       return;
     }
@@ -382,14 +382,14 @@ export const AdminFoundersDashboard: React.FC<AdminFoundersDashboardProps> = ({
     }
   };
 
-  // Update a SPECIFIC merchant's custom commission rate (Validated 0-50%, never negative, logged)
+  // Update a SPECIFIC merchant's custom commission rate (Validated 0-100%, never negative, logged)
   const handleUpdateStoreCommission = async (storeId: string, newRate: number) => {
     const validation = validateCommissionRate(newRate);
     if (!validation.valid) {
       setCommissionError(
         isArabic
-          ? `خطأ: نسبة العمولة يجب أن تكون بين 0% و 50% فقط ولا تقبل القيم السالبة.`
-          : validation.error || 'Commission must be between 0% and 50%.'
+          ? `خطأ: نسبة العمولة يجب أن تكون بين 0% و 100% فقط ولا تقبل القيم السالبة.`
+          : validation.error || 'Commission must be between 0% and 100%.'
       );
       setTimeout(() => setCommissionError(null), 4000);
       return;
@@ -1017,7 +1017,7 @@ export const AdminFoundersDashboard: React.FC<AdminFoundersDashboardProps> = ({
     e.preventDefault();
     const validation = validateCommissionRate(commissionRate);
     if (!validation.valid) {
-      setCommissionError(validation.error || 'Commission must be 0-50%.');
+      setCommissionError(validation.error || 'Commission must be 0-100%.');
       return;
     }
 
@@ -1814,9 +1814,9 @@ export const AdminFoundersDashboard: React.FC<AdminFoundersDashboardProps> = ({
                     <input
                       type="number"
                       min={0}
-                      max={50}
+                      max={100}
                       value={newStoreRate}
-                      onChange={(e) => setNewStoreRate(Number(e.target.value))}
+                      onChange={(e) => setNewStoreRate(Math.max(0, Math.min(100, Number(e.target.value))))}
                       className="w-full h-10 px-3 bg-white border border-[#EAE4DC] rounded-lg text-xs font-metric font-bold text-[#DC2626]"
                     />
                   </div>
@@ -2127,29 +2127,43 @@ export const AdminFoundersDashboard: React.FC<AdminFoundersDashboardProps> = ({
                     </div>
                   </div>
 
-                  {/* Interactive Commission Controller (0-50%) */}
+                  {/* Interactive Commission Controller (0-100%) */}
                   <div className="p-3.5 bg-[#FAF7F2] rounded-xl border border-[#EAE4DC] space-y-2.5">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="font-bold text-xs text-[#1C1917] flex items-center gap-1">
                         <Percent className="w-3.5 h-3.5 text-[#DC2626]" />
-                        <span>{isArabic ? 'نسبة عمولة المتجر (0-50%):' : 'Store Rate (0-50%):'}</span>
+                        <span>{isArabic ? 'نسبة عمولة المتجر (0-100%):' : 'Store Rate (0-100%):'}</span>
                       </span>
 
                       <div className="flex items-center gap-1.5 font-metric">
                         <button
                           type="button"
-                          onClick={() => handleUpdateStoreCommission(store.id, store.commissionPercent - 1)}
-                          className="w-6 h-6 rounded-lg bg-white hover:bg-amber-50 border border-[#EAE4DC] text-[#1C1917] font-bold flex items-center justify-center transition-all active:scale-90 cursor-pointer"
+                          onClick={() => handleUpdateStoreCommission(store.id, Math.max(0, store.commissionPercent - 1))}
+                          className="w-7 h-7 rounded-lg bg-white hover:bg-amber-50 border border-[#EAE4DC] text-[#1C1917] font-bold flex items-center justify-center transition-all active:scale-90 cursor-pointer"
                         >
                           -
                         </button>
-                        <span className="font-extrabold text-sm text-[#DC2626] bg-white border border-amber-300 px-2 py-0.5 rounded-lg min-w-[48px] text-center">
-                          {store.commissionPercent}%
-                        </span>
+                        <div className="relative flex items-center">
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={store.commissionPercent}
+                            onChange={(e) => {
+                              const parsed = Number(e.target.value);
+                              if (!Number.isNaN(parsed)) {
+                                handleUpdateStoreCommission(store.id, Math.max(0, Math.min(100, parsed)));
+                              }
+                            }}
+                            className="w-16 h-7 font-extrabold text-sm text-[#DC2626] bg-white border border-amber-300 px-2 rounded-lg text-center focus:outline-none focus:border-[#DC2626]"
+                          />
+                          <span className="text-xs font-bold text-[#DC2626] ms-1">%</span>
+                        </div>
                         <button
                           type="button"
-                          onClick={() => handleUpdateStoreCommission(store.id, store.commissionPercent + 1)}
-                          className="w-6 h-6 rounded-lg bg-white hover:bg-amber-50 border border-[#EAE4DC] text-[#1C1917] font-bold flex items-center justify-center transition-all active:scale-90 cursor-pointer"
+                          onClick={() => handleUpdateStoreCommission(store.id, Math.min(100, store.commissionPercent + 1))}
+                          className="w-7 h-7 rounded-lg bg-white hover:bg-amber-50 border border-[#EAE4DC] text-[#1C1917] font-bold flex items-center justify-center transition-all active:scale-90 cursor-pointer"
                         >
                           +
                         </button>
@@ -2825,21 +2839,21 @@ export const AdminFoundersDashboard: React.FC<AdminFoundersDashboardProps> = ({
               />
             </div>
 
-            {/* Platform commission rate (0 - 50%) */}
+            {/* Platform commission rate (0 - 100%) */}
             <div className="p-4 bg-[#FAF7F2] rounded-xl border border-[#EAE4DC] space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-[#1C1917] text-xs">
-                  {isArabic ? 'نسبة عمولة المنصة الافتراضية على المتاجر (0% - 50%):' : 'Default Platform Commission Rate (0% - 50%):'}
+                  {isArabic ? 'نسبة عمولة المنصة الافتراضية على المتاجر (0% - 100%):' : 'Default Platform Commission Rate (0% - 100%):'}
                 </span>
                 <span className="font-metric font-bold text-[#DC2626]">{commissionRate}%</span>
               </div>
               <input
                 type="number"
                 min={0}
-                max={50}
+                max={100}
                 step={1}
                 value={commissionRate}
-                onChange={(e) => setCommissionRate(Math.max(0, Math.min(50, Number(e.target.value))))}
+                onChange={(e) => setCommissionRate(Math.max(0, Math.min(100, Number(e.target.value))))}
                 className="w-full h-10 px-3 bg-white border border-[#EAE4DC] rounded-lg text-xs font-metric"
               />
             </div>

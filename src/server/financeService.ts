@@ -409,7 +409,7 @@ export function getPlatformFinancialSummary() {
     totalMerchantNetPayableAed: filsToAed(totalMerchantPayoutsFils),
     totalJeeblyLogisticsPaidAed: filsToAed(totalLogisticsFeesFils),
     totalPlatformLoyaltyExpenseAed: filsToAed(totalLoyaltyFundedFils),
-    commissionModel: '0-50% Validated Per-Merchant Commission + Fixed 1.50 AED Customer Service Fee',
+    commissionModel: '0-100% Flexible Per-Merchant Commission + Fixed 1.50 AED Customer Service Fee',
     logisticsModel: 'Self-Pickup Only at Restaurant Counter (No Delivery)',
     settlementPartner: 'Wio Bank PJSC - Wio Business Corporate IBAN Settlement',
     loyaltyFundingModel: '100% Platform Funded by Flaster (Zero Merchant Deductions)',

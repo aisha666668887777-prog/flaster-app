@@ -46,11 +46,9 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   variant = 'header',
 }) => {
   const {
-    isInstallable,
     isInstalled,
     isIOS,
     isModalOpen,
-    install,
     dismissModal,
     openModal,
   } = usePWAInstall();
@@ -61,7 +59,6 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   const [activePlatformTab, setActivePlatformTab] = useState<'android' | 'ios'>(
     isIOS ? 'ios' : 'android'
   );
-  const [showAndroidFallbackSteps, setShowAndroidFallbackSteps] = useState(false);
 
   useEffect(() => {
     if (isIOS) {
@@ -86,19 +83,6 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   if (isInstalled) {
     return null;
   }
-
-  const handlePrimaryInstallClick = async () => {
-    if (isInstallable) {
-      const accepted = await install();
-      if (!accepted) {
-        setShowAndroidFallbackSteps(true);
-      }
-    } else if (isIOS) {
-      setActivePlatformTab('ios');
-    } else {
-      setShowAndroidFallbackSteps(true);
-    }
-  };
 
   // Sidebar variant renders a clean solid Emerald Green button inside the Sidebar drawer
   if (variant === 'sidebar') {
@@ -225,69 +209,78 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
                   </button>
                 </div>
 
-                {/* TAB 1: ANDROID / CHROME */}
+                {/* TAB 1: ANDROID / CHROME (Clear Step-by-Step Guide — No Misleading Button) */}
                 {activePlatformTab === 'android' && (
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#EAE4DC] space-y-3 text-center">
-                      <p className="text-xs sm:text-sm font-bold text-[#1C1917] leading-relaxed">
+                  <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF7F2] border border-[#EAE4DC] space-y-3.5">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-headline font-extrabold text-sm text-[#1C1917]">
                         {isArabic
-                          ? 'اضغط على الزر الأخضر بالأسفل لإضافة تطبيق فلاستر مباشرة إلى الشاشة الرئيسية لهاتفك:'
-                          : 'Tap the green button below to install Flaster directly onto your phone home screen:'}
-                      </p>
-
-                      <button
-                        type="button"
-                        onClick={handlePrimaryInstallClick}
-                        className="w-full py-4 px-6 rounded-2xl bg-[#059669] hover:bg-[#047857] text-white font-headline font-extrabold text-base shadow-md flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer"
-                      >
-                        <Download className="w-5 h-5" />
-                        <span>
-                          {isArabic ? 'تثبيت الآن (Install Now)' : 'Install Now (تثبيت الآن)'}
-                        </span>
-                      </button>
+                          ? 'طريقة إضافة التطبيق على أندرويد (Chrome):'
+                          : 'How to Add Flaster on Android (Chrome):'}
+                      </h3>
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">
+                        {isArabic ? '3 خطوات سهلة' : '3 Easy Steps'}
+                      </span>
                     </div>
 
-                    {/* Step-by-step Chrome guide if native prompt is not immediately triggered */}
-                    {(showAndroidFallbackSteps || !isInstallable) && (
-                      <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#EAE4DC] space-y-2.5 text-xs">
-                        <p className="font-headline font-extrabold text-[#1C1917] flex items-center gap-1.5">
-                          <MoreVertical className="w-4 h-4 text-[#DC2626]" />
-                          <span>
+                    <div className="space-y-2.5 text-xs">
+                      {/* Step 1 */}
+                      <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-[#EAE4DC]">
+                        <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 border border-amber-300 flex items-center justify-center shrink-0 font-extrabold">
+                          <MoreVertical className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1">
+                          <span className="font-bold text-[#1C1917] block">
                             {isArabic
-                              ? 'أو بخطوتين سريعتين من متصفح Chrome:'
-                              : 'Or in 2 quick taps from Chrome menu:'}
+                              ? '1. اضغط على قائمة الثلاث نقاط (⋮)'
+                              : '1. Tap the 3-dots menu (⋮)'}
                           </span>
-                        </p>
-                        <div className="space-y-2 text-[#44403C]">
-                          <div className="flex items-center gap-2.5 bg-white p-2.5 rounded-xl border border-[#EAE4DC]">
-                            <span className="w-6 h-6 rounded-full bg-[#DC2626] text-white font-bold flex items-center justify-center text-xs shrink-0">
-                              1
-                            </span>
-                            <span>
-                              {isArabic ? 'اضغط على قائمة الثلاث نقاط' : 'Tap the 3-dots menu'}{' '}
-                              <strong className="px-1.5 py-0.5 bg-amber-100 text-amber-950 rounded border border-amber-300">
-                                ⋮
-                              </strong>{' '}
-                              {isArabic ? 'في أعلى المتصفح.' : 'at the top corner of Chrome.'}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2.5 bg-white p-2.5 rounded-xl border border-[#EAE4DC]">
-                            <span className="w-6 h-6 rounded-full bg-[#059669] text-white font-bold flex items-center justify-center text-xs shrink-0">
-                              2
-                            </span>
-                            <span>
-                              {isArabic ? 'اختر' : 'Tap'}{' '}
-                              <strong className="text-[#059669]">
-                                {isArabic
-                                  ? '«تثبيت التطبيق» أو «الإضافة إلى الشاشة الرئيسية»'
-                                  : '"Install app" or "Add to Home screen"'}
-                              </strong>
-                              .
-                            </span>
-                          </div>
+                          <span className="text-[#78716C] text-[11px]">
+                            {isArabic
+                              ? 'الموجودة في أعلى الزاوية في متصفح جوجل كروم (Chrome).'
+                              : 'Located at the top corner of your Google Chrome browser.'}
+                          </span>
                         </div>
                       </div>
-                    )}
+
+                      {/* Step 2 */}
+                      <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-[#EAE4DC]">
+                        <div className="w-9 h-9 rounded-xl bg-red-50 text-[#DC2626] border border-red-200 flex items-center justify-center shrink-0 font-extrabold">
+                          <PlusSquare className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1">
+                          <span className="font-bold text-[#1C1917] block">
+                            {isArabic
+                              ? '2. اختر «الإضافة إلى الشاشة الرئيسية» أو «تثبيت التطبيق»'
+                              : '2. Select "Add to Home screen" or "Install app"'}
+                          </span>
+                          <span className="text-[#78716C] text-[11px]">
+                            {isArabic
+                              ? 'من القائمة التي ستظهر لك مباشرة.'
+                              : 'Choose it from the dropdown menu.'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Step 3 */}
+                      <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-[#EAE4DC]">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-[#059669] border border-emerald-200 flex items-center justify-center shrink-0 font-extrabold">
+                          <CheckCircle2 className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1">
+                          <span className="font-bold text-[#1C1917] block">
+                            {isArabic
+                              ? '3. اضغط «تثبيت» أو «إضافة» (Install / Add)'
+                              : '3. Tap "Install" or "Add"'}
+                          </span>
+                          <span className="text-[#78716C] text-[11px]">
+                            {isArabic
+                              ? 'سيظهر تطبيق Flaster بشعاره الرسمي على شاشة جوالك ويعمل مثل أي تطبيق!'
+                              : 'Flaster will appear on your home screen and launch like a native app!'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 

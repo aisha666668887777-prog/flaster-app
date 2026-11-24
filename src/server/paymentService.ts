@@ -13,7 +13,7 @@
  */
 
 import crypto from 'crypto';
-import { getMerchantCommissionPercent } from './financeService.ts';
+import { getMerchantCommissionPercent, getPlatformSettings } from './financeService.ts';
 import { filsToAed } from '../config/platformConfig.ts';
 
 export interface PaymentIntentRequest {
@@ -129,7 +129,7 @@ export function getPaymentGatewayConfig() {
     applePayConfigured: true,
     supportedPaymentMethods: ['credit_card', 'apple_pay', 'pickup_cash'] as const,
     supportedCurrencies: ['AED'],
-    commissionRatePercent: 15,
+    commissionRatePercent: getPlatformSettings().defaultCommissionPercent,
     cashOnPickupSupported: true,
   };
 }

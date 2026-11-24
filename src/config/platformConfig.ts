@@ -14,7 +14,7 @@ export interface PlatformSettings {
   vatRatePercent: number; // 5% UAE VAT included in prices
   defaultCommissionPercent: number; // 15% default
   minCommissionPercent: number; // 0%
-  maxCommissionPercent: number; // 50%
+  maxCommissionPercent: number; // 100%
   welcomeBonusPoints: number; // 90 points awarded upon signup
   pointsPerAed: number; // 100 points = 1 AED (1 point = 1 fil)
   sequentialInvoiceCounter: number;
@@ -31,7 +31,7 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   vatRatePercent: 5,
   defaultCommissionPercent: 15,
   minCommissionPercent: 0,
-  maxCommissionPercent: 50,
+  maxCommissionPercent: 100,
   welcomeBonusPoints: 90,
   pointsPerAed: 100,
   sequentialInvoiceCounter: 1001,
@@ -129,7 +129,7 @@ export function calculateNetExclVatFils(totalFils: number): number {
 }
 
 /**
- * Validates merchant commission rate: must be a number between 0 and 50 inclusive, never negative.
+ * Validates merchant commission rate: must be a number between 0 and 100 inclusive, never negative.
  */
 export function validateCommissionRate(rate: number): { valid: boolean; sanitizedRate: number; error?: string } {
   if (typeof rate !== 'number' || Number.isNaN(rate) || !Number.isFinite(rate)) {
@@ -138,8 +138,8 @@ export function validateCommissionRate(rate: number): { valid: boolean; sanitize
   if (rate < 0) {
     return { valid: false, sanitizedRate: 0, error: 'Commission rate cannot be negative (minimum 0%)' };
   }
-  if (rate > 50) {
-    return { valid: false, sanitizedRate: 50, error: 'Commission rate cannot exceed 50% (allowed range: 0–50%)' };
+  if (rate > 100) {
+    return { valid: false, sanitizedRate: 100, error: 'Commission rate cannot exceed 100% (allowed range: 0–100%)' };
   }
   return { valid: true, sanitizedRate: Number(rate.toFixed(2)) };
 }

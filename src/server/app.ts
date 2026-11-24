@@ -101,6 +101,7 @@ export function createServer() {
 
   // Lightweight API request telemetry & error/security observer (no PII or secrets logged)
   app.use('/api', (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
     trackApiRequest();
     res.on('finish', () => {
       if (res.statusCode >= 500) {
