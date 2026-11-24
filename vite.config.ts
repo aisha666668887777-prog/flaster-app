@@ -36,18 +36,23 @@ export default defineConfig(() => {
       },
       VitePWA({
         registerType: 'autoUpdate',
+        injectRegister: null,
         manifestFilename: 'manifest.json',
-        includeAssets: ['apple-touch-icon.png', 'flaster-app-icon.jpg', 'pwa-192x192.png', 'pwa-512x512.png', 'pwa-maskable-512x512.png'],
+        includeAssets: ['flaster-app-icon.jpg'],
         manifest: {
           id: '/',
           name: 'Flaster • فلاستر - استمتع بالأفضل ووفر الأكثر',
           short_name: 'Flaster',
           description: 'فلاستر (Flaster): استمتع بالأفضل ووفر الأكثر — احصل على أشهى وجبات ومخبوزات أفضل مطاعم وكافيهات رأس الخيمة طازجة يومياً بخصم يصل إلى 70%.',
+          lang: 'ar',
+          dir: 'rtl',
+          orientation: 'portrait',
           theme_color: '#ee5253',
           background_color: '#FAF7F2',
           display: 'standalone',
           start_url: '/',
           scope: '/',
+          categories: ['food', 'shopping', 'lifestyle'],
           icons: [
             {
               src: '/pwa-192x192.png?v=2',
@@ -73,10 +78,48 @@ export default defineConfig(() => {
           enabled: false,
         },
         workbox: {
+          cleanupOutdatedCaches: true,
+          skipWaiting: true,
+          clientsClaim: true,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          globIgnores: ['**/service-worker.js', '**/google*.html', '**/assets/aistudio/**'],
           maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
-          navigateFallbackDenylist: [/^\/__cookie_check/, /^\/api\//],
+          navigateFallback: '/index.html',
+          navigateFallbackDenylist: [
+            /^\/__cookie_check/,
+            /^\/api\//,
+            /^\/sitemap\.xml/,
+            /^\/robots\.txt/,
+            /^\/google.*\.html/,
+          ],
           runtimeCaching: [
+            {
+              // Never cache live backend API routes (orders, payments, auth, loyalty, health)
+              urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+              handler: 'NetworkOnly',
+            },
+            {
+              // Never cache Firebase Auth or Firestore live API calls
+              urlPattern: /^https:\/\/(firestore|identitytoolkit|securetoken)\.googleapis\.com\/.*/i,
+              handler: 'NetworkOnly',
+            },
+            {
+              // Same-origin images & icons: fast load with background refresh
+              urlPattern: ({ request, url }) =>
+                request.destination === 'image' &&
+                url.origin === self.location.origin,
+              handler: 'StaleWhileRevalidate',
+              options: {
+                cacheName: 'flaster-images-cache',
+                expiration: {
+                  maxEntries: 80,
+                  maxAgeSeconds: 60 * 60 * 24 * 30,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'CacheFirst',
@@ -117,6 +160,7 @@ export default defineConfig(() => {
     build: {
       sourcemap: false,
       emptyOutDir: true,
+      chunkSizeWarningLimit: 2000,
     },
     server: {
       port: 3000,

@@ -82,6 +82,7 @@ import { AdminFoundersDashboard } from './components/AdminFoundersDashboard';
 import { SocialMediaKitModal } from './components/SocialMediaKitModal';
 import { RestaurantPartnerModal } from './components/RestaurantPartnerModal';
 import { SocialLinksRewardsBanner } from './components/SocialLinksRewardsBanner';
+import { PWAUpdateBanner } from './components/PWAUpdateBanner';
 import { 
   Leaf, 
   ShieldCheck, 
@@ -2096,6 +2097,9 @@ export default function App() {
         }}
         lang={lang}
       />
+
+      {/* Non-intrusive PWA Update Banner (only shown if update awaits user confirmation) */}
+      <PWAUpdateBanner lang={lang} />
 
     </div>
   );

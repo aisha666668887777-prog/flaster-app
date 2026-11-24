@@ -55,40 +55,50 @@ router.post('/register-bonus', async (req, res) => {
  * 1. GET /api/loyalty/wallet/:customerId
  */
 router.get('/wallet/:customerId', async (req, res) => {
-  const { customerId } = req.params;
-  if (!customerId) {
-    return res.status(400).json({ success: false, error: 'customerId مطلوب' });
-  }
-
-  const caller = await resolveCallerIdentity(req);
-  const isAdmin =
-    caller.role === 'super_admin' || caller.role === 'ops_admin' || caller.role === 'founder_admin';
-  const headerCid =
-    typeof req.headers['x-customer-id'] === 'string' ? req.headers['x-customer-id'].trim() : '';
-
-  if (caller.authenticated && caller.role === 'customer' && caller.uid && !isAdmin) {
-    if (customerId !== caller.uid && customerId !== headerCid && !customerId.startsWith('+')) {
-      return res.status(403).json({ success: false, error: 'Forbidden: لا يمكنك استعراض محفظة عميل آخر' });
+  try {
+    const { customerId } = req.params;
+    if (!customerId) {
+      return res.status(400).json({ success: false, error: 'customerId مطلوب' });
     }
-  }
 
-  await hydrateWalletFromFirestore(customerId);
-  const summary = getCustomerLoyaltySummary(customerId);
-  return res.json({ success: true, ...summary });
+    const caller = await resolveCallerIdentity(req);
+    const isAdmin =
+      caller.role === 'super_admin' || caller.role === 'ops_admin' || caller.role === 'founder_admin';
+    const headerCid =
+      typeof req.headers['x-customer-id'] === 'string' ? req.headers['x-customer-id'].trim() : '';
+
+    if (caller.authenticated && caller.role === 'customer' && caller.uid && !isAdmin) {
+      if (customerId !== caller.uid && customerId !== headerCid && !customerId.startsWith('+')) {
+        return res.status(403).json({ success: false, error: 'Forbidden: لا يمكنك استعراض محفظة عميل آخر' });
+      }
+    }
+
+    await hydrateWalletFromFirestore(customerId);
+    const summary = getCustomerLoyaltySummary(customerId);
+    return res.json({ success: true, ...summary });
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ success: false, error: errorMsg });
+  }
 });
 
 /**
  * 2. POST /api/loyalty/daily-login
  */
 router.post('/daily-login', async (req, res) => {
-  const { customerId } = req.body || {};
-  if (!customerId || typeof customerId !== 'string') {
-    return res.status(400).json({ success: false, error: 'customerId مطلوب' });
-  }
+  try {
+    const { customerId } = req.body || {};
+    if (!customerId || typeof customerId !== 'string') {
+      return res.status(400).json({ success: false, error: 'customerId مطلوب' });
+    }
 
-  await hydrateWalletFromFirestore(customerId);
-  const result = claimDailyLoginReward(customerId);
-  return res.json(result);
+    await hydrateWalletFromFirestore(customerId);
+    const result = claimDailyLoginReward(customerId);
+    return res.json(result);
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ success: false, error: errorMsg });
+  }
 });
 
 /**
@@ -96,18 +106,23 @@ router.post('/daily-login', async (req, res) => {
  * Awards 5 points per followed official Flaster platform (5 platforms max).
  */
 router.post('/social-follow', async (req, res) => {
-  const { customerId, pageId, handle } = req.body || {};
-  if (!customerId || typeof customerId !== 'string' || !pageId || typeof pageId !== 'string') {
-    return res.status(400).json({ success: false, error: 'customerId و pageId مطلوبان' });
-  }
+  try {
+    const { customerId, pageId, handle } = req.body || {};
+    if (!customerId || typeof customerId !== 'string' || !pageId || typeof pageId !== 'string') {
+      return res.status(400).json({ success: false, error: 'customerId و pageId مطلوبان' });
+    }
 
-  await hydrateWalletFromFirestore(customerId);
-  const result = claimSocialFollowReward(
-    customerId,
-    pageId,
-    typeof handle === 'string' ? handle : undefined
-  );
-  return res.json(result);
+    await hydrateWalletFromFirestore(customerId);
+    const result = claimSocialFollowReward(
+      customerId,
+      pageId,
+      typeof handle === 'string' ? handle : undefined
+    );
+    return res.json(result);
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ success: false, error: errorMsg });
+  }
 });
 
 /**
@@ -115,13 +130,18 @@ router.post('/social-follow', async (req, res) => {
  * Deducts 5 points if customer unfollowed the platform.
  */
 router.post('/admin/revoke-social-follow', requireAdminAuth, async (req, res) => {
-  const { customerId, pageId } = req.body || {};
-  if (!customerId || typeof customerId !== 'string' || !pageId || typeof pageId !== 'string') {
-    return res.status(400).json({ success: false, error: 'customerId و pageId مطلوبان' });
+  try {
+    const { customerId, pageId } = req.body || {};
+    if (!customerId || typeof customerId !== 'string' || !pageId || typeof pageId !== 'string') {
+      return res.status(400).json({ success: false, error: 'customerId و pageId مطلوبان' });
+    }
+    await hydrateWalletFromFirestore(customerId);
+    const result = revokeSocialFollowReward(customerId, pageId);
+    return res.json(result);
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ success: false, error: errorMsg });
   }
-  await hydrateWalletFromFirestore(customerId);
-  const result = revokeSocialFollowReward(customerId, pageId);
-  return res.json(result);
 });
 
 /**

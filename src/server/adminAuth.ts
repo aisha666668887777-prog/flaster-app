@@ -26,22 +26,33 @@ try {
 
 // Robust Firebase Admin Initialization supporting multiple environment variable strategies
 // (FIREBASE_SERVICE_ACCOUNT_JSON, GOOGLE_APPLICATION_CREDENTIALS, or individual keys)
-let adminAppInstance = null;
+let adminAppInstance: ReturnType<typeof initializeApp> | null = null;
+let hasExplicitAdminCredentials = false;
+
 if (!getApps().length) {
   try {
-    let credentialOpt = undefined;
+    let credentialOpt: ReturnType<typeof cert> | undefined = undefined;
     const serviceAccountJsonStr = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim();
     const clientEmail = (process.env.FIREBASE_CLIENT_EMAIL || process.env.CLIENT_EMAIL || '').trim();
     const privateKey = (process.env.FIREBASE_PRIVATE_KEY || process.env.PRIVATE_KEY || '').trim();
     const envProjectId = (process.env.FIREBASE_PROJECT_ID || process.env.PROJECT_ID || '').trim();
+    const hasAdcFile = Boolean((process.env.GOOGLE_APPLICATION_CREDENTIALS || '').trim());
 
-    if (serviceAccountJsonStr) {
+    if (serviceAccountJsonStr.startsWith('{')) {
       const parsed = JSON.parse(serviceAccountJsonStr);
-      credentialOpt = cert(parsed);
-      if (parsed.project_id) {
-        firebaseConfig.projectId = parsed.project_id;
+      if (parsed && parsed.client_email && parsed.private_key) {
+        credentialOpt = cert(parsed);
+        if (parsed.project_id) {
+          firebaseConfig.projectId = parsed.project_id;
+        }
       }
-    } else if (clientEmail && privateKey) {
+    } else if (serviceAccountJsonStr) {
+      console.warn(
+        'ℹ️ FIREBASE_SERVICE_ACCOUNT_JSON does not contain valid JSON; running in public-cert auth mode (safe for Render).'
+      );
+    }
+
+    if (!credentialOpt && clientEmail && privateKey) {
       credentialOpt = cert({
         projectId: envProjectId || firebaseConfig.projectId,
         clientEmail,
@@ -49,41 +60,57 @@ if (!getApps().length) {
       });
     }
 
-    const initOptions: any = {
-      projectId: envProjectId || firebaseConfig.projectId,
-    };
-    if (credentialOpt) {
-      initOptions.credential = credentialOpt;
+    if (credentialOpt || hasAdcFile) {
+      const initOptions: { projectId: string; credential?: ReturnType<typeof cert> } = {
+        projectId: envProjectId || firebaseConfig.projectId,
+      };
+      if (credentialOpt) {
+        initOptions.credential = credentialOpt;
+      }
+      adminAppInstance = initializeApp(initOptions);
+      hasExplicitAdminCredentials = true;
+      console.log('✅ Firebase Admin initialized successfully with credentials.');
+    } else {
+      console.log(
+        'ℹ️ Firebase Admin running in lightweight public-cert mode (no ADC metadata lookups).'
+      );
     }
-
-    adminAppInstance = initializeApp(initOptions);
-    console.log('✅ Firebase Admin initialized successfully with credentials.');
   } catch (err: unknown) {
-    console.warn('⚠️ Warning: Firebase Admin failed to initialize with explicit credentials. Falling back to default/offline mode:', err instanceof Error ? err.message : String(err));
-    try {
-      adminAppInstance = initializeApp({ projectId: firebaseConfig.projectId });
-    } catch (innerErr) {
-      console.warn('⚠️ Firebase Admin default init fallback also failed (normal if ADC is not configured on external hosting platforms like Render):', innerErr instanceof Error ? innerErr.message : String(innerErr));
-    }
+    console.warn(
+      'ℹ️ Firebase Admin credentials skipped (using safe public-cert mode):',
+      err instanceof Error ? err.message : String(err)
+    );
+    adminAppInstance = null;
+    hasExplicitAdminCredentials = false;
   }
 } else {
   adminAppInstance = getApps()[0];
+  hasExplicitAdminCredentials = Boolean(
+    (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim().startsWith('{') ||
+      ((process.env.FIREBASE_CLIENT_EMAIL || process.env.CLIENT_EMAIL || '').trim() &&
+        (process.env.FIREBASE_PRIVATE_KEY || process.env.PRIVATE_KEY || '').trim()) ||
+      (process.env.GOOGLE_APPLICATION_CREDENTIALS || '').trim()
+  );
 }
 
 export const adminAuth = (() => {
+  if (!hasExplicitAdminCredentials || !adminAppInstance) {
+    return {} as any;
+  }
   try {
-    return adminAppInstance ? getAuth(adminAppInstance) : getAuth();
-  } catch (err) {
-    console.warn('⚠️ adminAuth unavailable in offline mode:', err);
+    return getAuth(adminAppInstance);
+  } catch {
     return {} as any;
   }
 })();
 
 export const adminDb = (() => {
+  if (!hasExplicitAdminCredentials || !adminAppInstance) {
+    return {} as any;
+  }
   try {
-    return adminAppInstance ? getFirestore(adminAppInstance, firebaseConfig.firestoreDatabaseId) : getFirestore(firebaseConfig.firestoreDatabaseId);
-  } catch (err) {
-    console.warn('⚠️ adminDb unavailable in offline mode:', err);
+    return getFirestore(adminAppInstance, firebaseConfig.firestoreDatabaseId);
+  } catch {
     return {} as any;
   }
 })();
@@ -96,11 +123,11 @@ let ephemeralPickupPepper: string | null = null;
 export function getPortalSessionSecret(): string {
   const configured = (process.env.PORTAL_SESSION_SECRET || '').trim();
   if (configured) return configured;
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('CONFIGURATION_ERROR: PORTAL_SESSION_SECRET must be set in production');
-  }
   if (!ephemeralSessionSecret) {
     ephemeralSessionSecret = crypto.randomBytes(32).toString('hex');
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('⚠️ PORTAL_SESSION_SECRET is not set; using in-memory CSPRNG fallback until configured.');
+    }
   }
   return ephemeralSessionSecret;
 }
@@ -108,11 +135,11 @@ export function getPortalSessionSecret(): string {
 export function getPickupSecretPepper(): string {
   const configured = (process.env.PICKUP_SECRET_PEPPER || '').trim();
   if (configured) return configured;
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('CONFIGURATION_ERROR: PICKUP_SECRET_PEPPER must be set in production');
-  }
   if (!ephemeralPickupPepper) {
     ephemeralPickupPepper = crypto.randomBytes(32).toString('hex');
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('⚠️ PICKUP_SECRET_PEPPER is not set; using in-memory CSPRNG fallback until configured.');
+    }
   }
   return ephemeralPickupPepper;
 }
@@ -1051,27 +1078,32 @@ export async function requireAdminAuth(
   res: express.Response,
   next: express.NextFunction
 ) {
-  const caller = await resolveCallerIdentity(req);
-  if (!caller.authenticated) {
-    return res.status(caller.tokenStatusCode || 401).json({
-      success: false,
-      error:
-        caller.tokenError ||
-        'انتهت جلسة الدخول الإدارية أو لم يتم التحقق منها. يرجى تسجيل الدخول بحساب Google للمشرف ثم المحاولة مجدداً.',
-    });
+  try {
+    const caller = await resolveCallerIdentity(req);
+    if (!caller.authenticated) {
+      return res.status(caller.tokenStatusCode || 401).json({
+        success: false,
+        error:
+          caller.tokenError ||
+          'انتهت جلسة الدخول الإدارية أو لم يتم التحقق منها. يرجى تسجيل الدخول بحساب Google للمشرف ثم المحاولة مجدداً.',
+      });
+    }
+    if (
+      caller.role !== 'super_admin' &&
+      caller.role !== 'ops_admin' &&
+      caller.role !== 'founder_admin'
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: 'هذا الإجراء مخصص لحساب الإدارة العليا فقط.',
+      });
+    }
+    (req as express.Request & { caller?: ResolvedCaller }).caller = caller;
+    return next();
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Authentication check failed';
+    return res.status(500).json({ success: false, error: msg });
   }
-  if (
-    caller.role !== 'super_admin' &&
-    caller.role !== 'ops_admin' &&
-    caller.role !== 'founder_admin'
-  ) {
-    return res.status(403).json({
-      success: false,
-      error: 'هذا الإجراء مخصص لحساب الإدارة العليا فقط.',
-    });
-  }
-  (req as express.Request & { caller?: ResolvedCaller }).caller = caller;
-  return next();
 }
 
 /**
@@ -1082,30 +1114,35 @@ export async function requireMerchantOrAdminAuth(
   res: express.Response,
   next: express.NextFunction
 ) {
-  const caller = await resolveCallerIdentity(req);
-  if (!caller.authenticated) {
-    return res.status(caller.tokenStatusCode || 401).json({
-      success: false,
-      error: caller.tokenError || 'Unauthorized: Merchant or Admin authentication required',
-    });
+  try {
+    const caller = await resolveCallerIdentity(req);
+    if (!caller.authenticated) {
+      return res.status(caller.tokenStatusCode || 401).json({
+        success: false,
+        error: caller.tokenError || 'Unauthorized: Merchant or Admin authentication required',
+      });
+    }
+    if (
+      caller.role !== 'merchant' &&
+      caller.role !== 'super_admin' &&
+      caller.role !== 'ops_admin' &&
+      caller.role !== 'founder_admin'
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: Merchant or Admin privileges required',
+      });
+    }
+    if (caller.role === 'merchant' && !caller.merchantId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: Merchant token must include authoritative merchantId',
+      });
+    }
+    (req as express.Request & { caller?: ResolvedCaller }).caller = caller;
+    return next();
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Authentication check failed';
+    return res.status(500).json({ success: false, error: msg });
   }
-  if (
-    caller.role !== 'merchant' &&
-    caller.role !== 'super_admin' &&
-    caller.role !== 'ops_admin' &&
-    caller.role !== 'founder_admin'
-  ) {
-    return res.status(403).json({
-      success: false,
-      error: 'Forbidden: Merchant or Admin privileges required',
-    });
-  }
-  if (caller.role === 'merchant' && !caller.merchantId) {
-    return res.status(403).json({
-      success: false,
-      error: 'Forbidden: Merchant token must include authoritative merchantId',
-    });
-  }
-  (req as express.Request & { caller?: ResolvedCaller }).caller = caller;
-  return next();
 }

@@ -1,0 +1,242 @@
+import { registerSW } from 'virtual:pwa-register';
+
+export interface PwaUpdateState {
+  updateAvailable: boolean;
+  isUpdating: boolean;
+}
+
+type Listener = (state: PwaUpdateState) => void;
+
+const RELOAD_GUARD_KEY = 'flaster_pwa_last_reload_ts';
+const RELOAD_COOLDOWN_MS = 10_000;
+const UPDATE_CHECK_THROTTLE_MS = 30_000;
+const PERIODIC_CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+
+let initialized = false;
+let state: PwaUpdateState = {
+  updateAvailable: false,
+  isUpdating: false,
+};
+const listeners = new Set<Listener>();
+let triggerUpdateFn: ((reloadPage?: boolean) => Promise<void>) | null = null;
+let lastUpdateCheckTs = 0;
+
+function emit() {
+  for (const listener of listeners) {
+    listener({ ...state });
+  }
+}
+
+function setState(partial: Partial<PwaUpdateState>) {
+  state = { ...state, ...partial };
+  emit();
+}
+
+export function subscribePwaUpdate(listener: Listener): () => void {
+  listeners.add(listener);
+  listener({ ...state });
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function isUserActivelyTyping(): boolean {
+  const active = document.activeElement;
+  if (!active) return false;
+  const tag = active.tagName.toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+    return true;
+  }
+  return (active as HTMLElement).isContentEditable === true;
+}
+
+function canSafelyAutoReload(): boolean {
+  try {
+    const lastReloadRaw = sessionStorage.getItem(RELOAD_GUARD_KEY);
+    if (lastReloadRaw) {
+      const elapsed = Date.now() - Number(lastReloadRaw);
+      if (Number.isFinite(elapsed) && elapsed < RELOAD_COOLDOWN_MS) {
+        return false;
+      }
+    }
+  } catch {
+    // Ignore storage access errors in restricted modes
+  }
+  return true;
+}
+
+function performSafeReload() {
+  if (!canSafelyAutoReload()) {
+    return;
+  }
+  try {
+    sessionStorage.setItem(RELOAD_GUARD_KEY, String(Date.now()));
+  } catch {
+    // Ignore storage errors
+  }
+  window.location.reload();
+}
+
+export async function applyPwaUpdateNow(): Promise<void> {
+  if (state.isUpdating) return;
+  setState({ isUpdating: true });
+
+  try {
+    if (triggerUpdateFn) {
+      await triggerUpdateFn(true);
+    }
+  } catch {
+    // Fall back to direct reload below
+  }
+
+  // Fallback reload in case SW already activated or controllerchange didn't fire
+  window.setTimeout(() => {
+    performSafeReload();
+  }, 400);
+}
+
+/**
+ * Unregister any leftover legacy `/service-worker.js` registrations and purge
+ * old static `flaster-pwa-cache-*` caches so Workbox `/sw.js` is the single
+ * source of truth for offline caching and updates.
+ */
+async function cleanupLegacyServiceWorkers(): Promise<void> {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+    return;
+  }
+
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(
+      registrations.map((reg) => {
+        const scriptUrl =
+          reg.active?.scriptURL ||
+          reg.waiting?.scriptURL ||
+          reg.installing?.scriptURL ||
+          '';
+        if (scriptUrl.includes('/service-worker.js')) {
+          return reg.unregister();
+        }
+        return Promise.resolve(false);
+      })
+    );
+  } catch {
+    // Ignore getRegistrations errors
+  }
+
+  try {
+    if ('caches' in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames
+          .filter((name) => name.startsWith('flaster-pwa-cache'))
+          .map((name) => caches.delete(name))
+      );
+    }
+  } catch {
+    // Ignore cache cleanup errors
+  }
+}
+
+export function initPwaUpdates(): void {
+  if (initialized || typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+    return;
+  }
+  initialized = true;
+
+  // Run legacy SW cleanup asynchronously without blocking initial render
+  void cleanupLegacyServiceWorkers();
+
+  // Only auto-reload when a previous SW was already controlling the page
+  // (avoids unnecessary reload on first-ever visit)
+  const hadControllerAtBoot = Boolean(navigator.serviceWorker.controller);
+  let controllerReloadTriggered = false;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadControllerAtBoot || controllerReloadTriggered) {
+      return;
+    }
+    controllerReloadTriggered = true;
+
+    // If user is mid-input (e.g., checkout/auth form), prompt via banner instead of interrupting
+    if (isUserActivelyTyping()) {
+      setState({ updateAvailable: true, isUpdating: false });
+      return;
+    }
+
+    performSafeReload();
+  });
+
+  // Listen for migration completion message from legacy /service-worker.js
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'FLASTER_LEGACY_SW_CLEANED') {
+      if (isUserActivelyTyping()) {
+        setState({ updateAvailable: true, isUpdating: false });
+      } else {
+        performSafeReload();
+      }
+    }
+  });
+
+  // Register Workbox Service Worker generated by vite-plugin-pwa (/sw.js)
+  // In dev mode (when devOptions.enabled is false), virtual:pwa-register is a safe no-op.
+  triggerUpdateFn = registerSW({
+    immediate: true,
+    onNeedRefresh() {
+      // Exposed in case a waiting SW needs user confirmation
+      setState({ updateAvailable: true, isUpdating: false });
+    },
+    onRegisteredSW(_swUrl, registration) {
+      if (!registration) return;
+
+      const checkForUpdate = (force = false) => {
+        if (!navigator.onLine) return;
+        const now = Date.now();
+        if (!force && now - lastUpdateCheckTs < UPDATE_CHECK_THROTTLE_MS) {
+          return;
+        }
+        lastUpdateCheckTs = now;
+        registration.update().catch(() => {
+          // Ignore transient offline/network update errors
+        });
+      };
+
+      // Check immediately on startup
+      checkForUpdate(true);
+
+      // Critical for iOS Safari & Android Home Screen standalone PWAs:
+      // Standalone apps stay suspended in memory; re-check whenever app returns to foreground.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          checkForUpdate();
+        }
+      });
+
+      window.addEventListener('focus', () => {
+        checkForUpdate();
+      });
+
+      // iOS Safari bfcache restoration event
+      window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+          checkForUpdate(true);
+        }
+      });
+
+      // Re-check as soon as connectivity returns
+      window.addEventListener('online', () => {
+        checkForUpdate(true);
+      });
+
+      // Periodic background check while open
+      window.setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          checkForUpdate();
+        }
+      }, PERIODIC_CHECK_INTERVAL_MS);
+    },
+    onRegisterError(error) {
+      console.warn('[PWA] Service Worker registration error:', error);
+    },
+  });
+}
