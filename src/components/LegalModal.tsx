@@ -178,24 +178,13 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               <section className="space-y-1.5">
                 <h4 className="font-bold text-sm text-[#0F172A]">
                   {isArabic
-                    ? '1. طبيعة الخدمة ومفهوم باقات الفائض'
-                    : '1. Nature of Service & Surplus Boxes'}
+                    ? '1. طبيعة الخدمة وأصناف الطعام المعروضة'
+                    : '1. Nature of Service & Fresh Food Items'}
                 </h4>
                 <p>
                   {isArabic
                     ? 'توفر منصة فلاستر (Flaster) وسيطاً رقمياً يربط بين المتاجر والمخابز والمطاعم والأسواق والمشاريع المنزلية المرخصة، وبين الزبائن الراغبين في إنقاذ الأغذية الفائضة بأسعار مخفضة تصل إلى 70%. الأسعار المعروضة شاملة ضريبة القيمة المضافة 5% (VAT = الإجمالي × 5 / 105).'
                     : 'Flaster connects licensed food merchants, bakeries, supermarkets, and home kitchens with consumers to rescue fresh daily surplus at discounts up to 70%. Displayed prices include 5% UAE VAT (VAT = Total × 5 / 105).'}
-                </p>
-              </section>
-
-              <section className="space-y-1.5">
-                <h4 className="font-bold text-sm text-[#0F172A]">
-                  {isArabic ? '2. برنامج نقاط الولاء الترحيبية (500 نقطة)' : '2. Welcome Loyalty Points (500 Pts)'}
-                </h4>
-                <p>
-                  {isArabic
-                    ? 'يحصل المستخدم الجديد الذي يوثق رقم هاتفه الإماراتي عبر رمز OTP على 500 نقطة ترحيبية (تعادل 5 دراهم) تُضاف تلقائياً بعد إتمام استلام طلبه الأول بنجاح. تمول المنصة هذه النقاط بالكامل دون أي استقطاع من مستحقات المتاجر.'
-                    : 'New users who verify their UAE mobile number via SMS OTP receive 500 welcome points (AED 5 value) unlocked automatically upon completing their first order. Points are 100% funded by Flaster.'}
                 </p>
               </section>
             </div>
@@ -221,8 +210,8 @@ export const LegalModal: React.FC<LegalModalProps> = ({
                 </h4>
                 <p>
                   {isArabic
-                    ? 'نجمع فقط رقم الهاتف المتحرك الموثق عبر OTP، الاسم، البريد الإلكتروني الاختياري لإرسال الإيصالات، وعناوين التوصيل المحفوظة.'
-                    : 'We collect only your OTP-verified mobile number, name, optional email for receipts, and saved delivery addresses.'}
+                    ? 'نجمع فقط رقم الهاتف المتحرك الموثق، الاسم، والبريد الإلكتروني الاختياري لإرسال الإيصالات وتصاريح الاستلام.'
+                    : 'We collect only your verified mobile number, name, and optional email for receipts and pickup passes.'}
                 </p>
               </section>
 
@@ -276,8 +265,8 @@ export const LegalModal: React.FC<LegalModalProps> = ({
                 </h4>
                 <p>
                   {isArabic
-                    ? 'نظراً لأن الوجبات المعروضة هي فائض غذائي طازج يُحجز خصيصاً لك لمنع هدره، يُحظر إلغاء الطلب أو استرداد قيمته بعد قبول المتجر للطلب (Accepted)، أو أثناء تحضيره (Preparing)، أو بعد جاهزيته (Ready)، أو بعد استلامه/توصيله (Picked Up / Delivered / Completed).'
-                    : 'Because surplus food packages are reserved specifically to prevent waste, cancellations and refunds are strictly blocked once the merchant has accepted, prepared, handed over, or delivered the order.'}
+                    ? 'نظراً لأن الوجبات المعروضة هي فائض غذائي طازج يُحجز خصيصاً لك لمنع هدره، يُحظر إلغاء الطلب أو استرداد قيمته بعد قبول المتجر للطلب (Accepted)، أو أثناء تحضيره (Preparing)، أو بعد جاهزيته (Ready)، أو بعد استلامه من المطعم (Picked Up / Completed).'
+                    : 'Because surplus food packages are reserved specifically to prevent waste, cancellations and refunds are strictly blocked once the merchant has accepted, prepared, or handed over the order at pickup.'}
                 </p>
               </section>
             </div>

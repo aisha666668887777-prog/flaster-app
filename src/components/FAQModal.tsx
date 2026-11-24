@@ -55,10 +55,10 @@ export const FAQModal: React.FC<FAQModalProps> = ({
       icon: CreditCard
     },
     {
-      qAr: 'كيف أحصل على 500 نقطة ترحيبية وأستفيد منها؟',
-      qEn: 'How do I get the 500 welcome points and redeem them?',
-      aAr: 'بمجرد تسجيل حساب جديد برقم هاتفك وتأكيد الرمز، يتم إضافة 500 نقطة ولاء مجاناً إلى محفظتك تلقائياً! كل 100 نقطة تساوي 1 درهم إماراتي، مما يعني أنك حصلت على 5 دراهم يمكنك خصمها فوراً من قيمة طلبك عند الدفع دون أي قيود.',
-      aEn: 'Signing up automatically credits 500 bonus points (= AED 5.00) to your wallet. Every 100 points equals AED 1, redeemable directly on your checkout.',
+      qAr: 'كيف أكسب نقاط فلاستر وأستبدلها بخصم؟',
+      qEn: 'How do I earn and redeem Flaster points?',
+      aAr: 'تُحفظ نقاطك تلقائياً في حسابك! يمكنك جمع النقاط عبر تسجيل الدخول اليومي (+1 نقطة يومياً)، ومتابعة منصاتنا الرسمية من داخل نافذة «نقاطي» (+5 نقاط لكل منصة بعد توثيق اسم حسابك)، وإتمام الطلبات (+15 نقطة لكل طلب)، ومشاركة تقييمك (+10 نقاط). كل 100 نقطة = 1 درهم، والحد الأدنى للاستبدال هو 1000 نقطة (10 دراهم).',
+      aEn: 'Your points are saved automatically to your account! Earn points via daily check-in (+1 pt), following our official social channels inside "My Points" (+5 pts per platform with handle verification), completed orders (+15 pts), and reviews (+10 pts). Every 100 points = 1 AED, with a minimum redemption of 1,000 points (10 AED).',
       icon: Gift
     },
     {

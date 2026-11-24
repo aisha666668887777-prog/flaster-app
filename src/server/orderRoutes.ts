@@ -22,6 +22,12 @@ import {
   timingSafeStringEqual,
 } from './adminAuth.ts';
 import { awardPurchaseReward, refundRedeemedPoints } from './loyaltyService.ts';
+import {
+  MIN_MERCHANT_ITEM_PRICE_AED,
+  MIN_MERCHANT_ITEM_PRICE_FILS,
+} from '../config/platformConfig.ts';
+import { sendOrderConfirmationEmail } from './emailService.ts';
+import { recordOpsLog } from './opsService.ts';
 
 const router = express.Router();
 
@@ -198,10 +204,18 @@ router.post('/catalog', requireMerchantOrAdminAuth, (req, res) => {
     typeof item.discountedPriceFils === 'number' && Number.isInteger(item.discountedPriceFils)
       ? item.discountedPriceFils
       : Math.round(item.discountedPrice * 100);
-  const originalFils =
+  if (discountedFils < MIN_MERCHANT_ITEM_PRICE_FILS) {
+    return res.status(400).json({
+      success: false,
+      error: `الحد الأدنى لسعر الصنف هو ${MIN_MERCHANT_ITEM_PRICE_AED} درهماً إماراتياً (Minimum item price is ${MIN_MERCHANT_ITEM_PRICE_AED} AED).`,
+    });
+  }
+  const originalFils = Math.max(
+    discountedFils,
     typeof item.originalPriceFils === 'number' && Number.isInteger(item.originalPriceFils)
       ? item.originalPriceFils
-      : Math.round((item.originalPrice || item.discountedPrice) * 100);
+      : Math.round((item.originalPrice || item.discountedPrice) * 100)
+  );
 
   const authoritativeMerchantId =
     caller?.role === 'merchant'
@@ -244,10 +258,8 @@ router.post('/create', async (req, res) => {
       customerId,
       customerName,
       customerPhone,
-      deliveryAddress,
       merchantId,
       items,
-      fulfillmentType,
       paymentMethod,
       paymentStatus,
       paymentTransactionId,
@@ -284,10 +296,10 @@ router.post('/create', async (req, res) => {
       customerId: resolvedCustomerId,
       customerName,
       customerPhone,
-      deliveryAddress,
+      deliveryAddress: '',
       merchantId,
       items: sanitizedItems,
-      fulfillmentType: fulfillmentType === 'delivery' ? 'delivery' : 'pickup',
+      fulfillmentType: 'pickup',
       paymentMethod:
         paymentMethod === 'pickup_cash' || paymentMethod === 'credit_card'
           ? paymentMethod
@@ -301,6 +313,34 @@ router.post('/create', async (req, res) => {
 
     if (!orderResult.success) {
       return res.status(orderResult.conflict ? 409 : 400).json(orderResult);
+    }
+
+    recordOpsLog({
+      level: 'info',
+      category: 'order',
+      message: `Order created (${orderResult.order?.id || 'N/A'})`,
+      method: 'POST',
+      path: '/api/orders/create',
+      statusCode: 201,
+    });
+
+    const recipientEmail =
+      caller.email ||
+      (typeof req.body?.customerEmail === 'string' ? req.body.customerEmail.trim() : undefined);
+
+    if (recipientEmail && orderResult.order) {
+      void sendOrderConfirmationEmail({
+        toEmail: recipientEmail,
+        customerName: orderResult.order.customerName || customerName || 'عميل فليستر',
+        orderId: orderResult.order.id,
+        merchantName:
+          orderResult.order.item?.merchant?.nameAr ||
+          orderResult.order.item?.merchant?.name ||
+          String(merchantId),
+        totalAed: orderResult.order.totalAed,
+        pickupCode: orderResult.order.pickupCode || '',
+        paymentMethod: orderResult.order.paymentMethod || 'apple_pay',
+      });
     }
 
     return res.status(201).json(orderResult);
@@ -431,7 +471,7 @@ router.post('/verify-pickup', requireMerchantOrAdminAuth, async (req, res) => {
     let resolvedCustomerId = customerId;
 
     try {
-      const result = await adminDb.runTransaction(async (transaction) => {
+      const result = await adminDb.runTransaction(async (transaction: any) => {
         const secretRef = adminDb.collection('pickup_secrets').doc(orderId);
         const secretDoc = await transaction.get(secretRef);
 

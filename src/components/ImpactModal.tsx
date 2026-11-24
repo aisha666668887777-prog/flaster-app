@@ -50,7 +50,7 @@ export const ImpactModal: React.FC<ImpactModalProps> = ({
     },
     {
       title: isArabic ? 'حامي بوفيهات الفنادق' : '5-Star Buffet Savior',
-      desc: isArabic ? 'أنقذت ٣ بوكسات من أفخم فنادق رأس الخيمة' : 'Rescued 3 luxury resort dinner packs',
+      desc: isArabic ? 'أنقذت ٣ وجبات من أفخم مطاعم رأس الخيمة' : 'Rescued 3 luxury restaurant dishes',
       icon: '⭐',
       earned: true,
     },

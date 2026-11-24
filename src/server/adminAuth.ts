@@ -1,4 +1,4 @@
-import { getApps, initializeApp } from 'firebase-admin/app';
+import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import crypto from 'crypto';
@@ -24,16 +24,69 @@ try {
   // safe fallback
 }
 
-// Initialize Firebase Admin with designated cloud project ID
+// Robust Firebase Admin Initialization supporting multiple environment variable strategies
+// (FIREBASE_SERVICE_ACCOUNT_JSON, GOOGLE_APPLICATION_CREDENTIALS, or individual keys)
+let adminAppInstance = null;
 if (!getApps().length) {
-  initializeApp({
-    projectId: firebaseConfig.projectId,
-  });
+  try {
+    let credentialOpt = undefined;
+    const serviceAccountJsonStr = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim();
+    const clientEmail = (process.env.FIREBASE_CLIENT_EMAIL || process.env.CLIENT_EMAIL || '').trim();
+    const privateKey = (process.env.FIREBASE_PRIVATE_KEY || process.env.PRIVATE_KEY || '').trim();
+    const envProjectId = (process.env.FIREBASE_PROJECT_ID || process.env.PROJECT_ID || '').trim();
+
+    if (serviceAccountJsonStr) {
+      const parsed = JSON.parse(serviceAccountJsonStr);
+      credentialOpt = cert(parsed);
+      if (parsed.project_id) {
+        firebaseConfig.projectId = parsed.project_id;
+      }
+    } else if (clientEmail && privateKey) {
+      credentialOpt = cert({
+        projectId: envProjectId || firebaseConfig.projectId,
+        clientEmail,
+        privateKey: privateKey.replace(/\\n/g, '\n'),
+      });
+    }
+
+    const initOptions: any = {
+      projectId: envProjectId || firebaseConfig.projectId,
+    };
+    if (credentialOpt) {
+      initOptions.credential = credentialOpt;
+    }
+
+    adminAppInstance = initializeApp(initOptions);
+    console.log('✅ Firebase Admin initialized successfully with credentials.');
+  } catch (err: unknown) {
+    console.warn('⚠️ Warning: Firebase Admin failed to initialize with explicit credentials. Falling back to default/offline mode:', err instanceof Error ? err.message : String(err));
+    try {
+      adminAppInstance = initializeApp({ projectId: firebaseConfig.projectId });
+    } catch (innerErr) {
+      console.warn('⚠️ Firebase Admin default init fallback also failed (normal if ADC is not configured on external hosting platforms like Render):', innerErr instanceof Error ? innerErr.message : String(innerErr));
+    }
+  }
+} else {
+  adminAppInstance = getApps()[0];
 }
 
-export const adminAuth = getAuth();
-// Designated named Firestore Database ID as provisioned
-export const adminDb = getFirestore(firebaseConfig.firestoreDatabaseId);
+export const adminAuth = (() => {
+  try {
+    return adminAppInstance ? getAuth(adminAppInstance) : getAuth();
+  } catch (err) {
+    console.warn('⚠️ adminAuth unavailable in offline mode:', err);
+    return {} as any;
+  }
+})();
+
+export const adminDb = (() => {
+  try {
+    return adminAppInstance ? getFirestore(adminAppInstance, firebaseConfig.firestoreDatabaseId) : getFirestore(firebaseConfig.firestoreDatabaseId);
+  } catch (err) {
+    console.warn('⚠️ adminDb unavailable in offline mode:', err);
+    return {} as any;
+  }
+})();
 
 // Ephemeral per-process CSPRNG secrets for local dev/test when env vars are unset
 // Strictly NEVER static hardcoded literals in source code.
@@ -321,6 +374,26 @@ export async function setMerchantAccountDisabled(
 }
 
 /**
+ * Permanently deletes a merchant account from server memory and Firestore.
+ */
+export async function deleteMerchantAccount(merchantId: string): Promise<{ deleted: boolean }> {
+  const existing = merchantCredentialsById.get(merchantId);
+  if (existing) {
+    merchantIdByUsername.delete(existing.username);
+    merchantCredentialsById.delete(merchantId);
+  }
+  try {
+    if (adminDb && typeof adminDb.collection === 'function') {
+      await adminDb.collection('merchant_credentials').doc(merchantId).delete();
+      await adminDb.collection('merchants').doc(merchantId).delete();
+    }
+  } catch {
+    // Graceful fallback if Firestore Admin is offline
+  }
+  return { deleted: true };
+}
+
+/**
  * Lists public metadata for all restaurant accounts (never includes secretHash or salt).
  */
 export function listMerchantAccountsPublic(): MerchantAccountPublicInfo[] {
@@ -378,8 +451,11 @@ export async function authenticateMerchantLogin(
     };
   }
 
-  const merchantId = merchantIdByUsername.get(cleanUsername);
-  const record = merchantId ? merchantCredentialsById.get(merchantId) : undefined;
+  const resolvedMerchantId =
+    merchantIdByUsername.get(cleanUsername) ||
+    (merchantCredentialsById.has(cleanUsername) ? cleanUsername : undefined) ||
+    (merchantCredentialsById.has(`merchant-${cleanUsername}`) ? `merchant-${cleanUsername}` : undefined);
+  const record = resolvedMerchantId ? merchantCredentialsById.get(resolvedMerchantId) : undefined;
 
   // If username does not exist, run constant-time dummy scrypt + timingSafeEqual and return generic 401
   if (!record) {
@@ -698,8 +774,107 @@ export async function revokeUserClaims(
   };
 }
 
+// Cache Google's official Firebase Auth public x509 certificates for RS256 verification
+let cachedGoogleCerts: Record<string, string> = {};
+let cachedGoogleCertsExpiresAt = 0;
+
+async function getGoogleSecureTokenCerts(): Promise<Record<string, string>> {
+  const now = Date.now();
+  if (Object.keys(cachedGoogleCerts).length > 0 && now < cachedGoogleCertsExpiresAt) {
+    return cachedGoogleCerts;
+  }
+  const resp = await fetch(
+    'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com'
+  );
+  if (!resp.ok) {
+    throw new Error(`Failed to fetch Google public certificates (${resp.status})`);
+  }
+  const certs = (await resp.json()) as Record<string, string>;
+  const cacheControl = resp.headers.get('cache-control') || '';
+  const maxAgeMatch = cacheControl.match(/max-age=(\d+)/i);
+  const maxAgeSec = maxAgeMatch ? Math.max(60, Number(maxAgeMatch[1])) : 3600;
+  cachedGoogleCerts = certs;
+  cachedGoogleCertsExpiresAt = now + maxAgeSec * 1000;
+  return certs;
+}
+
+/**
+ * Cryptographically verifies a Firebase Auth RS256 ID Token against Google's official public x509 certs.
+ * Follows Firebase's official third-party JWT verification spec and works even when ADC/service-account
+ * IAM credentials are not configured on external hosting (e.g. Render).
+ */
+async function verifyFirebaseJwtWithGooglePublicCerts(
+  token: string,
+  expectedProjectId: string
+): Promise<Record<string, unknown>> {
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    throw new Error('Malformed Firebase ID token');
+  }
+  const [headerB64, payloadB64, sigB64] = parts;
+  const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString('utf8')) as {
+    alg?: string;
+    kid?: string;
+  };
+  if (header.alg !== 'RS256' || !header.kid) {
+    throw new Error('Unsupported JWT algorithm or missing kid');
+  }
+
+  const certs = await getGoogleSecureTokenCerts();
+  let certPem = certs[header.kid];
+  if (!certPem) {
+    // Force refresh once in case keys just rotated
+    cachedGoogleCertsExpiresAt = 0;
+    const freshCerts = await getGoogleSecureTokenCerts();
+    certPem = freshCerts[header.kid];
+  }
+  if (!certPem) {
+    throw new Error('Unknown Firebase JWT signing key (kid)');
+  }
+
+  const signingInput = Buffer.from(`${headerB64}.${payloadB64}`, 'utf8');
+  const signature = Buffer.from(sigB64, 'base64url');
+  const isSignatureValid = crypto.verify('RSA-SHA256', signingInput, certPem, signature);
+  if (!isSignatureValid) {
+    throw new Error('Invalid Firebase ID token signature');
+  }
+
+  const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8')) as Record<
+    string,
+    unknown
+  >;
+  const nowSec = Math.floor(Date.now() / 1000);
+  const exp = typeof payload.exp === 'number' ? payload.exp : 0;
+  const iat = typeof payload.iat === 'number' ? payload.iat : 0;
+  const aud = typeof payload.aud === 'string' ? payload.aud : '';
+  const iss = typeof payload.iss === 'string' ? payload.iss : '';
+  const sub = typeof payload.sub === 'string' ? payload.sub : '';
+
+  if (!sub || sub.length > 128) {
+    throw new Error('Firebase ID token missing valid sub');
+  }
+  if (exp <= nowSec) {
+    throw new Error('Firebase ID token has expired');
+  }
+  if (iat > nowSec + 300) {
+    throw new Error('Firebase ID token iat is in the future');
+  }
+  if (aud !== expectedProjectId) {
+    throw new Error(`Firebase ID token aud mismatch (expected ${expectedProjectId})`);
+  }
+  if (iss !== `https://securetoken.google.com/${expectedProjectId}`) {
+    throw new Error(`Firebase ID token iss mismatch`);
+  }
+
+  return {
+    ...payload,
+    uid: sub,
+  };
+}
+
 /**
  * Server-authoritative Firebase ID Token Verification with revocation check
+ * and cryptographic Google public-cert fallback when ADC/IAM is unavailable.
  */
 export async function verifyAuthToken(
   bearerToken: string,
@@ -721,7 +896,36 @@ export async function verifyAuthToken(
     if (!token) {
       return { valid: false, error: 'Empty or missing token' };
     }
-    const decoded = await adminAuth.verifyIdToken(token, checkRevoked);
+
+    let decoded: Record<string, unknown> | null = null;
+    if (adminAuth && typeof adminAuth.verifyIdToken === 'function') {
+      try {
+        decoded = (await adminAuth.verifyIdToken(token, checkRevoked)) as Record<string, unknown>;
+      } catch (verifyErr: unknown) {
+        const msg = verifyErr instanceof Error ? verifyErr.message : String(verifyErr);
+        const isExplicitTokenInvalid =
+          msg.includes('auth/id-token-revoked') ||
+          msg.includes('auth/user-disabled') ||
+          msg.includes('auth/id-token-expired');
+        if (isExplicitTokenInvalid) {
+          throw verifyErr;
+        }
+        // Fallback 1: Signature-only verification via Firebase Admin SDK (no IAM revocation call)
+        if (checkRevoked) {
+          try {
+            decoded = (await adminAuth.verifyIdToken(token, false)) as Record<string, unknown>;
+          } catch {
+            decoded = null;
+          }
+        }
+      }
+    }
+
+    // Fallback 2: Direct cryptographic RS256 verification against Google's official x509 public certs
+    if (!decoded) {
+      decoded = await verifyFirebaseJwtWithGooglePublicCerts(token, firebaseConfig.projectId);
+    }
+
     const email = typeof decoded.email === 'string' ? decoded.email : undefined;
     const emailVerified = Boolean(decoded.email_verified);
     let role = (decoded.role as string) || 'customer';
@@ -737,7 +941,7 @@ export async function verifyAuthToken(
 
     return {
       valid: true,
-      uid: decoded.uid,
+      uid: String(decoded.uid || decoded.sub || ''),
       email,
       emailVerified,
       role,
@@ -764,8 +968,42 @@ export interface ResolvedCaller {
 /**
  * Resolves caller identity strictly from signed x-portal-token header or Firebase Bearer ID Token.
  * NEVER trusts merchantId from query, body, or unsigned headers.
+ * Checks Firebase Bearer token as well so a stale or merchant x-portal-token never blocks a verified Google Admin.
  */
 export async function resolveCallerIdentity(req: express.Request): Promise<ResolvedCaller> {
+  const authHeader = req.headers.authorization;
+  let firebaseCaller: ResolvedCaller | null = null;
+  let firebaseTokenError: string | undefined;
+
+  if (authHeader) {
+    const fb = await verifyAuthToken(authHeader, true);
+    if (fb.valid && fb.uid) {
+      const normalizedRole =
+        fb.role === 'super_admin' || fb.role === 'ops_admin' || fb.role === 'founder_admin'
+          ? fb.role
+          : fb.role === 'merchant'
+            ? 'merchant'
+            : 'customer';
+      firebaseCaller = {
+        authenticated: true,
+        role: normalizedRole,
+        uid: fb.uid,
+        email: fb.email,
+        merchantId: fb.merchantId,
+      };
+      // Verified Firebase Admin always takes precedence over any stale/merchant portal token
+      if (
+        normalizedRole === 'super_admin' ||
+        normalizedRole === 'ops_admin' ||
+        normalizedRole === 'founder_admin'
+      ) {
+        return firebaseCaller;
+      }
+    } else if (fb.error) {
+      firebaseTokenError = fb.error;
+    }
+  }
+
   const portalHeader = req.headers['x-portal-token'];
   const portalTokenStr = Array.isArray(portalHeader) ? portalHeader[0] : portalHeader;
   if (portalTokenStr) {
@@ -783,6 +1021,9 @@ export async function resolveCallerIdentity(req: express.Request): Promise<Resol
         viaPortalToken: true,
       };
     }
+    if (firebaseCaller) {
+      return firebaseCaller;
+    }
     return {
       authenticated: false,
       role: 'anonymous',
@@ -791,27 +1032,15 @@ export async function resolveCallerIdentity(req: express.Request): Promise<Resol
     };
   }
 
-  const authHeader = req.headers.authorization;
-  if (authHeader) {
-    const fb = await verifyAuthToken(authHeader, true);
-    if (fb.valid && fb.uid) {
-      const normalizedRole =
-        fb.role === 'super_admin' || fb.role === 'ops_admin' || fb.role === 'founder_admin'
-          ? fb.role
-          : fb.role === 'merchant'
-            ? 'merchant'
-            : 'customer';
-      return {
-        authenticated: true,
-        role: normalizedRole,
-        uid: fb.uid,
-        email: fb.email,
-        merchantId: fb.merchantId,
-      };
-    }
+  if (firebaseCaller) {
+    return firebaseCaller;
   }
 
-  return { authenticated: false, role: 'anonymous' };
+  return {
+    authenticated: false,
+    role: 'anonymous',
+    ...(firebaseTokenError ? { tokenError: firebaseTokenError, tokenStatusCode: 401 } : {}),
+  };
 }
 
 /**
@@ -826,7 +1055,9 @@ export async function requireAdminAuth(
   if (!caller.authenticated) {
     return res.status(caller.tokenStatusCode || 401).json({
       success: false,
-      error: caller.tokenError || 'Unauthorized: Authentication required for executive admin access',
+      error:
+        caller.tokenError ||
+        'انتهت جلسة الدخول الإدارية أو لم يتم التحقق منها. يرجى تسجيل الدخول بحساب Google للمشرف ثم المحاولة مجدداً.',
     });
   }
   if (
@@ -836,7 +1067,7 @@ export async function requireAdminAuth(
   ) {
     return res.status(403).json({
       success: false,
-      error: 'Forbidden: Founders Admin privileges required',
+      error: 'هذا الإجراء مخصص لحساب الإدارة العليا فقط.',
     });
   }
   (req as express.Request & { caller?: ResolvedCaller }).caller = caller;

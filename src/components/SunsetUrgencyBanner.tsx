@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Clock, Flame, ArrowRight } from 'lucide-react';
 import { SurplusItem, Language } from '../types';
 import { translations } from '../translations';
+import { getCustomerItemPriceAed } from '../config/platformConfig';
 
 interface SunsetUrgencyBannerProps {
   items: SurplusItem[];
@@ -105,8 +106,8 @@ export const SunsetUrgencyBanner: React.FC<SunsetUrgencyBannerProps> = ({
                     </div>
 
                     <div className="flex items-center justify-between pt-1">
-                      <span className="font-metric font-extrabold text-sm text-[#DC2626]">
-                        {item.discountedPrice} {t.currency}
+                      <span className="font-metric font-extrabold text-sm text-[#DC2626] tabular-nums">
+                        {getCustomerItemPriceAed(item.discountedPrice).toFixed(2)} {t.currency}
                       </span>
                       <span className="text-[10px] text-stone-950 bg-amber-300 px-2.5 py-0.5 rounded-full font-extrabold flex items-center gap-0.5 group-hover:bg-amber-400 border border-amber-400">
                         <span>{lang === 'ar' ? 'احجز الآن' : 'Order'}</span>

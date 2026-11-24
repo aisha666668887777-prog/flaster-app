@@ -103,8 +103,8 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({
                 </p>
                 <p className="text-[11px] text-[#7F1D1D] leading-relaxed">
                   {isArabic 
-                    ? 'بدلاً من رمي الأطعمة الطازجة عند الإغلاق، يطرح الشيف أو مدير المطعم بوكسات مفاجئة بخصم 50% إلى 70%، ويستلم قيمتها فوراً.' 
-                    : 'Instead of discarding fresh food at closing, post surprise mystery packs at 50-70% off to recover costs.'}
+                    ? 'بدلاً من رمي الأطعمة الطازجة عند الإغلاق، يطرح الشيف أو مدير المطعم أصناف الطعام الطازجة بخصم 50% إلى 70%، ويستلم قيمتها فوراً.' 
+                    : 'Instead of discarding fresh food at closing, post individual fresh food items at 50-70% off to recover costs.'}
                 </p>
               </div>
 
@@ -153,8 +153,8 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({
                     </h5>
                     <p className="text-[#64748B] text-[11px] leading-relaxed">
                       {isArabic 
-                        ? 'عندما يحضر الزبون للكاونتر، يبرز لك كود QR على جواله؛ تسلمه البوكس وتنتهي العملية في 10 ثوانٍ!' 
-                        : 'Customer arrives with their QR pass; verify it in 10 seconds and hand over the meal pack!'}
+                        ? 'عندما يحضر الزبون للكاونتر، يبرز لك كود QR على جواله؛ تسلمه طلبه وتنتهي العملية في 10 ثوانٍ!' 
+                        : 'Customer arrives with their QR pass; verify it in 10 seconds and hand over the food item!'}
                     </p>
                   </div>
 
@@ -206,12 +206,12 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({
                     </div>
                     <div>
                       <h5 className="font-bold text-[#0F172A]">
-                        {isArabic ? 'تصفح البوكسات المتاحة' : 'Browse Available Surplus'}
+                        {isArabic ? 'تصفح أصناف الطعام المتاحة' : 'Browse Available Food Items'}
                       </h5>
                       <p className="text-[#64748B] text-[11px] mt-0.5">
                         {isArabic 
-                          ? 'اختر منطقتك في رأس الخيمة، واستكشف بوفيهات الفنادق، المخابز الفرنسية، أو الكافيهات.' 
-                          : 'Select your neighborhood in Ras Al Khaimah and discover active bakery & buffet bags.'}
+                          ? 'اختر منطقتك في رأس الخيمة، واستكشف أصناف المطاعم والمخابز والكافيهات.' 
+                          : 'Select your neighborhood in Ras Al Khaimah and discover fresh bakery & restaurant dishes.'}
                       </p>
                     </div>
                   </div>
@@ -222,12 +222,12 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({
                     </div>
                     <div>
                       <h5 className="font-bold text-[#0F172A]">
-                        {isArabic ? 'احجز البوكس قبل نفاده' : 'Reserve & Checkout'}
+                        {isArabic ? 'احجز الصنف قبل نفاده' : 'Reserve & Checkout'}
                       </h5>
                       <p className="text-[#64748B] text-[11px] mt-0.5">
                         {isArabic 
-                          ? 'اضغط "احجز الآن" لتأكيد حجز البوكس فوراً وحمايته قبل أن ينفد المخزون.' 
-                          : 'Tap "Reserve Now" to lock in your discounted surplus bag before sold out.'}
+                          ? 'اضغط "احجز الآن" لتأكيد حجز صنف الطعام فوراً وحمايته قبل أن ينفد المخزون.' 
+                          : 'Tap "Reserve Now" to lock in your discounted food item before sold out.'}
                       </p>
                     </div>
                   </div>
@@ -273,7 +273,7 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({
                 className="w-full h-12 rounded-xl bg-[#059669] hover:bg-[#047857] text-white font-bold flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 active:scale-98 transition-all"
               >
                 <ShoppingBag className="w-4 h-4" />
-                <span>{isArabic ? 'تصفح العروض والبوكسات الآن' : 'Start Browsing Deals'}</span>
+                <span>{isArabic ? 'تصفح أصناف الطعام والعروض الآن' : 'Start Browsing Food Deals'}</span>
               </button>
             </div>
           )}

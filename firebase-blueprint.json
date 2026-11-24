@@ -19,19 +19,59 @@
     },
     "Wallet": {
       "title": "Customer Loyalty Wallet",
-      "description": "Customer points balance and expiration tracking",
+      "description": "Persistent customer points balance, daily check-in date, claimed social pages, and expiration tracking",
       "type": "object",
       "properties": {
         "customerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-+]+$" },
+        "customerName": { "type": "string", "maxLength": 120 },
         "availablePoints": { "type": "number" },
         "totalEarnedPoints": { "type": "number" },
         "totalRedeemedPoints": { "type": "number" },
         "totalExpiredPoints": { "type": "number" },
         "welcomeBonusClaimed": { "type": "boolean" },
         "completedOrdersCount": { "type": "number" },
+        "claimedSocialPages": { "type": "array", "items": { "type": "string" } },
+        "lastDailyLoginDate": { "type": "string", "maxLength": 32 },
+        "nextExpirationDate": { "type": "string", "maxLength": 64 },
         "updatedAt": { "type": "string", "maxLength": 64 }
       },
       "required": ["customerId", "availablePoints", "welcomeBonusClaimed", "updatedAt"]
+    },
+    "LoyaltyTransaction": {
+      "title": "Customer Loyalty Transaction",
+      "description": "Ledger entry for earned, redeemed, or revoked customer loyalty points",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "maxLength": 64 },
+        "points": { "type": "number" },
+        "equivalentFils": { "type": "number" },
+        "equivalentAed": { "type": "number" },
+        "note": { "type": "string", "maxLength": 300 },
+        "relatedOrderId": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["COMPLETED", "CANCELLED"] },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "customerId", "type", "points", "status", "createdAt"]
+    },
+    "SocialFollowClaim": {
+      "title": "Social Media Follow Verification Claim",
+      "description": "Tracks customer @handle per social platform for admin audit and unfollow point deduction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-+]+$" },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 120 },
+        "pageId": { "type": "string", "enum": ["instagram", "tiktok", "snapchat", "facebook", "x"] },
+        "handle": { "type": "string", "maxLength": 64 },
+        "pointsAwarded": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "revoked"] },
+        "claimedAt": { "type": "string", "maxLength": 64 },
+        "revokedAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "customerId", "pageId", "handle", "pointsAwarded", "status", "claimedAt", "updatedAt"]
     },
     "Order": {
       "title": "Surplus Rescue Order",
@@ -44,6 +84,7 @@
         "customerId": { "type": "string", "maxLength": 128 },
         "merchantId": { "type": "string", "maxLength": 128 },
         "subtotalFils": { "type": "number" },
+        "serviceFeeFils": { "type": "number" },
         "deliveryFeeFils": { "type": "number" },
         "pointsDiscountFils": { "type": "number" },
         "vatFils": { "type": "number" },
@@ -52,7 +93,7 @@
           "type": "string",
           "enum": ["placed", "accepted", "preparing", "ready", "picked_up", "delivered", "completed", "cancelled"]
         },
-        "fulfillmentType": { "type": "string", "enum": ["pickup", "delivery"] },
+        "fulfillmentType": { "type": "string", "enum": ["pickup"] },
         "createdAt": { "type": "string", "maxLength": 64 },
         "updatedAt": { "type": "string", "maxLength": 64 }
       },
@@ -87,6 +128,8 @@
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "username": { "type": "string", "maxLength": 80 },
+        "disabled": { "type": "boolean" },
         "name": { "type": "string", "maxLength": 160 },
         "nameAr": { "type": "string", "maxLength": 160 },
         "category": { "type": "string", "maxLength": 64 },
@@ -165,7 +208,15 @@
     },
     "/wallets/{userId}": {
       "schema": { "$ref": "#/entities/Wallet" },
-      "description": "Customer loyalty wallets readable by owner, writable via server/admin"
+      "description": "Persistent customer loyalty wallets synced directly for the owning user and admins"
+    },
+    "/loyalty_transactions/{txnId}": {
+      "schema": { "$ref": "#/entities/LoyaltyTransaction" },
+      "description": "Customer loyalty ledger transactions readable and appendable by owner or admins"
+    },
+    "/social_follow_claims/{claimId}": {
+      "schema": { "$ref": "#/entities/SocialFollowClaim" },
+      "description": "Social follow verification handles submitted by customers and auditable/revocable by admins"
     },
     "/orders/{orderId}": {
       "schema": { "$ref": "#/entities/Order" },

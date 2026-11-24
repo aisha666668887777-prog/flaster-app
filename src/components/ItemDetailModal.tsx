@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { SurplusItem, Language } from '../types';
 import { translations } from '../translations';
+import { getCustomerItemPriceAed } from '../config/platformConfig';
 
 interface ItemDetailModalProps {
   item: SurplusItem | null;
@@ -54,9 +55,10 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const pickupDay = item.pickupDate === 'today' ? t.today : t.tomorrow;
 
   const maxAllowed = Math.min(item.stockRemaining, 4);
-  const totalDiscountedPrice = item.discountedPrice * quantity;
-  const totalOriginalPrice = item.originalPrice * quantity;
-  const totalSavings = totalOriginalPrice - totalDiscountedPrice;
+  const unitCustomerPrice = getCustomerItemPriceAed(item.discountedPrice);
+  const totalDiscountedPrice = Number((unitCustomerPrice * quantity).toFixed(2));
+  const totalOriginalPrice = Number((item.originalPrice * quantity).toFixed(2));
+  const totalSavings = Math.max(0, Number((totalOriginalPrice - totalDiscountedPrice).toFixed(2)));
 
   return (
     <div
@@ -132,6 +134,18 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   {item.merchant.rating} ({item.merchant.reviewsCount})
                 </span>
               </div>
+            </div>
+
+            {/* Store Category & Type Badge */}
+            <div className="flex items-center gap-2 pt-1">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-[#DC2626] font-bold text-xs">
+                <span>🍽️</span>
+                <span>{item.category === 'bakeries_coffeeshops' ? (isArabic ? 'مخابز ومقاهي' : 'Bakeries & Coffee') : item.category === 'supermarkets_groceries' ? (isArabic ? 'أسواق ومواد غذائية' : 'Supermarkets') : (isArabic ? 'مطاعم ومأكولات طازجة وتخفيضات يومية' : 'Restaurants & Daily Discounts')}</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
+                <span>📍</span>
+                <span>{neighborhood}</span>
+              </span>
             </div>
 
             <h2 className="font-headline font-extrabold text-2xl sm:text-3xl text-[#1C1917]">
@@ -297,16 +311,21 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 {totalOriginalPrice} {t.currency}
               </span>
               <div className="flex items-baseline gap-1">
-                <span className="font-headline font-extrabold text-2xl text-[#1C1917]">
-                  {totalDiscountedPrice}
+                <span className="font-headline font-extrabold text-2xl text-[#1C1917] tabular-nums">
+                  {totalDiscountedPrice.toFixed(2)}
                 </span>
                 <span className="font-metric text-xs font-bold text-[#ee5253]">
                   {t.currency}
                 </span>
                 <span className="text-[11px] text-[#059669] font-semibold ms-1">
-                  ({t.totalSavings}: {totalSavings} {t.currency})
+                  ({t.totalSavings}: {totalSavings.toFixed(2)} {t.currency})
                 </span>
               </div>
+              <span className="text-[10px] text-emerald-800 font-semibold mt-0.5">
+                {isArabic
+                  ? 'استلام شخصي من المطعم • شامل الضريبة'
+                  : 'Self-pickup at restaurant • VAT included'}
+              </span>
             </div>
           </div>
 

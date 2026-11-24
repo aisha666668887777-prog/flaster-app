@@ -5,7 +5,6 @@ import {
   Printer,
   AlertTriangle,
   RotateCcw,
-  Truck,
   ShieldCheck,
   Coins,
   Lock,
@@ -13,6 +12,7 @@ import {
 import { Order, Language } from '../types';
 import { translations } from '../translations';
 import {
+  CUSTOMER_SERVICE_FEE_FILS,
   aedToFils,
   calculateIncludedVatFils,
   calculateNetExclVatFils,
@@ -72,19 +72,21 @@ export const DigitalReceiptModal: React.FC<DigitalReceiptModalProps> = ({
     `INV-${new Date(order.createdAt).getUTCFullYear()}-${order.id.slice(-5).toUpperCase()}`;
 
   // All monetary amounts computed in integer UAE Fils (1 AED = 100 Fils)
-  const unitPriceFils =
+  const rawMerchantUnitFils =
     order.item.discountedPriceFils ?? aedToFils(order.item.discountedPrice);
-  const subtotalFils =
-    order.subtotalFils ?? unitPriceFils * order.quantity;
-  const deliveryFeeFils =
-    order.fulfillmentType === 'delivery'
-      ? order.deliveryFeeFils ?? aedToFils(order.deliveryFeeAed ?? 0)
-      : 0;
+  const rawSubtotalFils =
+    order.subtotalFils ?? rawMerchantUnitFils * order.quantity;
+  const serviceFeeFils =
+    order.serviceFeeFils ?? CUSTOMER_SERVICE_FEE_FILS * Math.max(1, order.quantity);
+  // Blended customer-facing subtotal & unit price (zero separate service fee line shown to customer)
+  const customerSubtotalFils = rawSubtotalFils + serviceFeeFils;
+  const unitPriceFils =
+    order.quantity > 0 ? Math.round(customerSubtotalFils / order.quantity) : customerSubtotalFils;
   const pointsDiscountFils =
     order.pointsDiscountFils ?? aedToFils(order.pointsDiscountAed ?? 0);
   const totalFils =
     order.totalFils ??
-    Math.max(0, subtotalFils + deliveryFeeFils - pointsDiscountFils);
+    Math.max(0, customerSubtotalFils - pointsDiscountFils);
 
   // Prices include 5% VAT -> VAT = totalFils * 5 / 105
   const vatFils = order.vatFils ?? calculateIncludedVatFils(totalFils);
@@ -259,7 +261,7 @@ export const DigitalReceiptModal: React.FC<DigitalReceiptModalProps> = ({
           {/* Itemized Line Items Table */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b pb-1">
-              <span>{isArabic ? 'الصنف / الباقة' : 'Item Description'}</span>
+              <span>{isArabic ? 'الصنف' : 'Item Description'}</span>
               <span>{isArabic ? 'المجموع' : 'Total'}</span>
             </div>
 
@@ -272,11 +274,11 @@ export const DigitalReceiptModal: React.FC<DigitalReceiptModalProps> = ({
                   </span>
                   <span className="text-[10px] text-slate-500 block">
                     {formatFilsToAedString(unitPriceFils)} {t.currency} /{' '}
-                    {isArabic ? 'بوكس' : 'pack'}
+                    {isArabic ? 'صنف' : 'item'}
                   </span>
                 </div>
-                <strong className="font-metric text-[#0F172A] text-xs">
-                  {formatFilsToAedString(subtotalFils)} {t.currency}
+                <strong className="font-metric text-[#0F172A] text-xs tabular-nums">
+                  {formatFilsToAedString(customerSubtotalFils)} {t.currency}
                 </strong>
               </div>
             </div>
@@ -285,31 +287,11 @@ export const DigitalReceiptModal: React.FC<DigitalReceiptModalProps> = ({
           {/* Pricing Totals Breakdown (Integer Fils -> Formatted Display) */}
           <div className="pt-2 border-t border-dashed border-slate-200 space-y-1.5 font-metric text-xs">
             <div className="flex justify-between text-slate-600">
-              <span>{isArabic ? 'المجموع الفرعي للوجبات:' : 'Subtotal:'}</span>
-              <span>
-                {formatFilsToAedString(subtotalFils)} {t.currency}
+              <span>{isArabic ? 'قيمة الأصناف:' : 'Items Subtotal:'}</span>
+              <span className="tabular-nums">
+                {formatFilsToAedString(customerSubtotalFils)} {t.currency}
               </span>
             </div>
-
-            {order.fulfillmentType === 'delivery' && (
-              <div className="flex justify-between text-slate-600">
-                <span className="flex items-center gap-1">
-                  <Truck className="w-3 h-3 text-amber-600" />
-                  <span>
-                    {isArabic
-                      ? 'توصيل مباشر من المطعم (رسوم المنصة):'
-                      : 'Direct Restaurant Delivery (Platform Fee):'}
-                  </span>
-                </span>
-                <span className="text-emerald-700 font-bold">
-                  {deliveryFeeFils > 0
-                    ? `+${formatFilsToAedString(deliveryFeeFils)} ${t.currency}`
-                    : isArabic
-                      ? '0.00 د.إ (توصيل المطعم)'
-                      : '0.00 AED (Restaurant)'}
-                </span>
-              </div>
-            )}
 
             {pointsDiscountFils > 0 && (
               <div className="flex justify-between text-[#059669] font-bold">
@@ -359,8 +341,8 @@ export const DigitalReceiptModal: React.FC<DigitalReceiptModalProps> = ({
               <span className="font-bold text-[#0F172A]">
                 {order.paymentMethod === 'pickup_cash'
                   ? isArabic
-                    ? '💵 نقداً عند الاستلام'
-                    : '💵 Cash on Delivery / Pickup'
+                    ? '💵 نقداً عند الاستلام من المطعم'
+                    : '💵 Cash on Pickup at Restaurant'
                   : order.paymentMethod === 'apple_pay'
                     ? ` Apple Pay (${order.paymentGateway || 'Ziina / Stripe UAE'})`
                     : `💳 ${isArabic ? 'بطاقة ائتمانية' : 'Card Payment'} (${order.paymentGateway || 'Ziina / Stripe UAE'})`}
@@ -410,8 +392,8 @@ export const DigitalReceiptModal: React.FC<DigitalReceiptModalProps> = ({
             </p>
             <p className="text-slate-600 leading-relaxed">
               {isArabic
-                ? 'يُسمح بإلغاء الطلب واسترداد المبلغ فقط قبل قبول المتجر للطلب أو بدء تحضيره. يُحظر الاسترداد بعد بدء التحضير أو الاستلام أو التوصيل.'
-                : 'Cancellations and refunds are allowed strictly before the merchant accepts or prepares the order, and are blocked after preparation, pickup, or delivery.'}
+                ? 'يُسمح بإلغاء الطلب واسترداد المبلغ فقط قبل قبول المتجر للطلب أو بدء تحضيره. يُحظر الاسترداد بعد بدء التحضير أو الاستلام.'
+                : 'Cancellations and refunds are allowed strictly before the merchant accepts or prepares the order, and are blocked after preparation or pickup.'}
             </p>
           </div>
 

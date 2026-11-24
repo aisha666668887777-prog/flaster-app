@@ -27,6 +27,7 @@ export interface SubmitOrderResponse {
   pickupCode?: string;
   totalFils?: number;
   vatFils?: number;
+  serviceFeeFils?: number;
   deliveryFeeFils?: number;
   subtotalFils?: number;
   pointsRedeemed?: number;

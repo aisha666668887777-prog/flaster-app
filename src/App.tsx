@@ -21,10 +21,18 @@ import {
   INITIAL_MERCHANT_PARTNERS
 } from './data/mockData';
 import { 
+  PersistedCustomerWallet,
   subscribeToSurplusItems, 
+  subscribeToMerchantPartners,
   subscribeToPlatformSettings, 
+  subscribeToCustomerWalletFull,
+  saveCustomerWalletToFirestore,
+  saveLoyaltyTransactionToFirestore,
   isSurplusItemExpired,
-  saveOrderToFirestore
+  saveOrderToFirestore,
+  saveSurplusItemToFirestore,
+  deleteSurplusItemFromFirestore,
+  deleteMerchantPartnerFromFirestore
 } from './firebase/db';
 import { 
   submitOrderToBackend, 
@@ -36,10 +44,13 @@ import {
 } from './firebase/orders';
 import { getAuthHeaders, setPortalSessionToken } from './firebase/authHeaders';
 import { 
+  CUSTOMER_SERVICE_FEE_FILS,
   DEFAULT_PLATFORM_SETTINGS, 
   PlatformSettings, 
+  ADMIN_EMAIL_ALLOWLIST,
   aedToFils, 
   filsToAed, 
+  getCustomerItemPriceAed,
   calculateIncludedVatFils, 
   formatSequentialInvoiceNumber 
 } from './config/platformConfig';
@@ -66,9 +77,11 @@ import { DigitalReceiptModal } from './components/DigitalReceiptModal';
 import { FAQModal } from './components/FAQModal';
 import { CustomerSupportModal } from './components/CustomerSupportModal';
 import { LegalModal } from './components/LegalModal';
+import { LegalConsentModal } from './components/LegalConsentModal';
 import { AdminFoundersDashboard } from './components/AdminFoundersDashboard';
 import { SocialMediaKitModal } from './components/SocialMediaKitModal';
 import { RestaurantPartnerModal } from './components/RestaurantPartnerModal';
+import { SocialLinksRewardsBanner } from './components/SocialLinksRewardsBanner';
 import { 
   Leaf, 
   ShieldCheck, 
@@ -84,7 +97,7 @@ import confetti from 'canvas-confetti';
 import flasterLogoImg from './assets/images/flaster_brand_logo_1794321576013.jpg';
 
 export default function App() {
-  const { currentUser } = useAuth();
+  const { currentUser, signOut } = useAuth();
   const [lang, setLang] = useState<Language>('ar');
   const [viewMode, setViewMode] = useState<'consumer' | 'merchant' | 'admin'>('consumer');
   const [selectedLocation, setSelectedLocation] = useState<string>('region-all');
@@ -93,77 +106,27 @@ export default function App() {
   const [filterExpiringOnly, setFilterExpiringOnly] = useState<boolean>(false);
   const [isMapView, setIsMapView] = useState<boolean>(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState<boolean>(false);
-  const [favorites, setFavorites] = useState<string[]>(['item-1', 'item-3']);
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [isSocialMediaKitOpen, setIsSocialMediaKitOpen] = useState<boolean>(false);
   const [isPartnerModalOpen, setIsPartnerModalOpen] = useState<boolean>(false);
+  const [isLegalConsentOpen, setIsLegalConsentOpen] = useState<boolean>(() => !localStorage.getItem('flaster_legal_accepted'));
 
   // Dynamic Regions & Categories fetched from database
   const [regions, setRegions] = useState<DynamicRegion[]>([]);
   const [categories, setCategories] = useState<DynamicCategory[]>([]);
 
-  // Customer Profile & Saved Addresses (Starts null when not logged in so Header shows 0 points)
+  // Customer Profile & Saved Addresses (Starts clean with zero demo data)
   const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
+  const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([]);
 
-  const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([
-    {
-      id: 'addr-1',
-      label: 'البيت',
-      type: 'home',
-      street: 'شارع الشريشة العام',
-      buildingOrVilla: 'فيلا 42',
-      city: 'رأس الخيمة',
-      isDefault: true,
-    },
-    {
-      id: 'addr-2',
-      label: 'العمل',
-      type: 'work',
-      street: 'طريق الجزيرة الحمراء',
-      buildingOrVilla: 'مبنى الأعمال 3',
-      city: 'قرية الحمراء',
-      isDefault: false,
-    }
-  ]);
-
-  // Core Data State
+  // Core Data State (Clean production slate synced live with Firestore)
   const [items, setItems] = useState<SurplusItem[]>(INITIAL_SURPLUS_ITEMS);
   const [merchantListings, setMerchantListings] = useState<MerchantListing[]>(INITIAL_MERCHANT_LISTINGS);
+  const [pausedListingIds, setPausedListingIds] = useState<string[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [invoiceCounter, setInvoiceCounter] = useState<number>(1002);
+  const [invoiceCounter, setInvoiceCounter] = useState<number>(1001);
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings>(DEFAULT_PLATFORM_SETTINGS);
-  
-  // Seed with one active order in 'placed' status so the user can test QR Pass and Refund Policy
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: 'ord-initial-1',
-      code: 'RAK-9281-WA',
-      pickupCode: '928104',
-      invoiceSequence: 1001,
-      invoiceNumber: formatSequentialInvoiceNumber(1001),
-      receiptNumber: formatSequentialInvoiceNumber(1001),
-      subtotalFils: 5500,
-      deliveryFeeFils: 0,
-      pointsDiscountFils: 0,
-      totalFils: 5500,
-      vatFils: calculateIncludedVatFils(5500),
-      vatAed: filsToAed(calculateIncludedVatFils(5500)),
-      item: INITIAL_SURPLUS_ITEMS[0],
-      quantity: 1,
-      totalAed: 55,
-      co2SavedKg: 4.2,
-      createdAt: new Date().toISOString(),
-      pickupStart: '21:30',
-      pickupEnd: '23:00',
-      pickupDate: 'today',
-      status: 'active',
-      workflowStatus: 'placed',
-      fulfillmentType: 'pickup',
-      customerName: 'سعود المنصوري',
-      customerPhone: '+971 50 123 4567',
-      paymentMethod: 'apple_pay',
-      refundStatus: 'none',
-    }
-  ]);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   // Modal / Drawer visibility
   const [selectedItem, setSelectedItem] = useState<SurplusItem | null>(null);
@@ -173,8 +136,9 @@ export default function App() {
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isLoyaltyOpen, setIsLoyaltyOpen] = useState(false);
-  // Real balance: 0 if not logged in
+  // Real balance synced live with Firestore /wallets/{uid} + localStorage mirror
   const [loyaltyPoints, setLoyaltyPoints] = useState<number>(0);
+  const [customerWalletSnapshot, setCustomerWalletSnapshot] = useState<PersistedCustomerWallet | null>(null);
   const [firstOrderBonusClaimed, setFirstOrderBonusClaimed] = useState<boolean>(false);
   const [checkoutItems, setCheckoutItems] = useState<{ item: SurplusItem; quantity: number }[]>([]);
   const [liveNotification, setLiveNotification] = useState<{ title: string; body: string } | null>(null);
@@ -207,11 +171,132 @@ export default function App() {
   };
 
   const handleAddPartnerStore = (newPartner: MerchantPartner, newItem?: SurplusItem) => {
-    setMerchantPartners((prev) => [newPartner, ...prev]);
+    setMerchantPartners((prev) => [newPartner, ...prev.filter((m) => m.id !== newPartner.id)]);
     if (newItem) {
-      setItems((prev) => [newItem, ...prev]);
+      setItems((prev) => [newItem, ...prev.filter((it) => it.id !== newItem.id)]);
+    }
+    // Immediately sync the newly added store into Partner Portal if founder/admin is active
+    if (isMasterFounder) {
+      setIsMerchantAuthenticated(true);
+      setAuthenticatedMerchant({
+        merchantId: newPartner.id,
+        username: newPartner.username || newPartner.id.replace(/^merchant-/, ''),
+        name: newPartner.name,
+        nameAr: newPartner.nameAr,
+        phone: newPartner.phone || '+971500000000',
+        disabled: Boolean(newPartner.disabled),
+        failedAttempts: 0,
+        lockedUntil: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
     }
   };
+
+  const handleDeleteMerchant = (merchantId: string) => {
+    setMerchantPartners((prev) => prev.filter((m) => m.id !== merchantId));
+    setItems((prev) => prev.filter((it) => it.merchant.id !== merchantId));
+    void deleteMerchantPartnerFromFirestore(merchantId);
+  };
+
+  const handleUpdateMerchantStatus = (merchantId: string, disabled: boolean) => {
+    setMerchantPartners((prev) =>
+      prev.map((m) => (m.id === merchantId ? { ...m, disabled } : m))
+    );
+  };
+
+  const activeFounderEmail = (customerProfile?.email || currentUser?.email || '').toLowerCase();
+  const isMasterFounder = Boolean(
+    currentUser?.isAdmin ||
+    (activeFounderEmail && ADMIN_EMAIL_ALLOWLIST.includes(activeFounderEmail))
+  );
+
+  // Sync authenticated Firebase user into customerProfile on session restore or Google Sign-In
+  useEffect(() => {
+    if (currentUser && !currentUser.isAnonymous && !customerProfile) {
+      setCustomerProfile({
+        id: currentUser.uid,
+        name:
+          currentUser.displayName ||
+          currentUser.email?.split('@')[0] ||
+          (lang === 'ar' ? 'حساب فلاستر' : 'Flaster Account'),
+        phone: currentUser.phone || '+971504116994',
+        email: currentUser.email || '',
+        savedAddresses,
+        loyaltyPoints,
+        welcomeBonusClaimed: false,
+        completedOrdersCount: 0,
+        joinedAt: new Date().toISOString(),
+      });
+    }
+  }, [currentUser, customerProfile, lang, loyaltyPoints, savedAddresses]);
+
+  // Auto-authenticate master founders & keep active Partner Portal store synced live with Admin changes
+  useEffect(() => {
+    if (isMasterFounder && viewMode === 'merchant' && !isMerchantAuthenticated) {
+      setIsMerchantAuthenticated(true);
+    }
+
+    if (merchantPartners.length === 0) return;
+
+    if (isMasterFounder) {
+      const currentExists = authenticatedMerchant
+        ? merchantPartners.find((m) => m.id === authenticatedMerchant.merchantId)
+        : undefined;
+
+      if (!authenticatedMerchant || authenticatedMerchant.merchantId === 'merchant-master' || !currentExists) {
+        const firstStore = merchantPartners[0];
+        setAuthenticatedMerchant({
+          merchantId: firstStore.id,
+          username: firstStore.username || firstStore.id.replace(/^merchant-/, ''),
+          name: firstStore.name,
+          nameAr: firstStore.nameAr,
+          phone: firstStore.phone || '+971500000000',
+          disabled: Boolean(firstStore.disabled),
+          failedAttempts: 0,
+          lockedUntil: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      } else if (
+        currentExists.name !== authenticatedMerchant.name ||
+        currentExists.nameAr !== authenticatedMerchant.nameAr ||
+        Boolean(currentExists.disabled) !== Boolean(authenticatedMerchant.disabled)
+      ) {
+        setAuthenticatedMerchant((prev) =>
+          prev
+            ? {
+                ...prev,
+                name: currentExists.name,
+                nameAr: currentExists.nameAr,
+                phone: currentExists.phone || prev.phone,
+                disabled: Boolean(currentExists.disabled),
+              }
+            : prev
+        );
+      }
+    } else if (authenticatedMerchant) {
+      const livePartner = merchantPartners.find((m) => m.id === authenticatedMerchant.merchantId);
+      if (
+        livePartner &&
+        (livePartner.name !== authenticatedMerchant.name ||
+          livePartner.nameAr !== authenticatedMerchant.nameAr ||
+          Boolean(livePartner.disabled) !== Boolean(authenticatedMerchant.disabled))
+      ) {
+        setAuthenticatedMerchant((prev) =>
+          prev
+            ? {
+                ...prev,
+                name: livePartner.name,
+                nameAr: livePartner.nameAr,
+                phone: livePartner.phone || prev.phone,
+                disabled: Boolean(livePartner.disabled),
+              }
+            : prev
+        );
+      }
+    }
+  }, [isMasterFounder, viewMode, isMerchantAuthenticated, authenticatedMerchant, merchantPartners]);
 
   const t = translations[lang];
 
@@ -221,10 +306,13 @@ export default function App() {
     document.documentElement.lang = lang;
   }, [lang]);
 
-  // Reactive Firestore Live Stream for Surplus Items and Platform Settings
+  // Reactive Firestore Live Stream for Surplus Items, Partner Merchants, and Platform Settings
   useEffect(() => {
     const unsubscribeItems = subscribeToSurplusItems((liveItems) => {
       setItems(liveItems);
+    });
+    const unsubscribeMerchants = subscribeToMerchantPartners((liveMerchants) => {
+      setMerchantPartners(liveMerchants);
     });
     const unsubscribeSettings = subscribeToPlatformSettings((liveSettings) => {
       setPlatformSettings(liveSettings);
@@ -234,6 +322,7 @@ export default function App() {
     });
     return () => {
       unsubscribeItems();
+      unsubscribeMerchants();
       unsubscribeSettings();
     };
   }, []);
@@ -308,30 +397,144 @@ export default function App() {
     };
   }, [customerProfile?.id, currentUser?.uid, viewMode, isMerchantAuthenticated, authenticatedMerchant?.merchantId]);
 
-  // Fetch initial loyalty points balance ONLY when user is logged in (0 if not logged in)
+  // Permanently sync & persist customer loyalty wallet via Firestore /wallets/{uid} + localStorage mirror
   useEffect(() => {
-    const customerUid = customerProfile?.id || currentUser?.uid;
-    if (!customerUid) {
+    const customerUid = currentUser?.uid || customerProfile?.id;
+    if (!customerUid || customerUid === 'guest') {
       setLoyaltyPoints(0);
+      setCustomerWalletSnapshot(null);
       return;
     }
-    let active = true;
-    (async () => {
-      try {
-        const headers = await getAuthHeaders(customerUid);
-        const res = await fetch(`/api/loyalty/wallet/${encodeURIComponent(customerUid)}`, { headers });
-        const data = await res.json();
-        if (active && data.success && data.wallet?.availablePoints !== undefined) {
-          setLoyaltyPoints(data.wallet.availablePoints);
+
+    const cacheKey = `flaster_wallet_v2_${customerUid}`;
+    let cachedWallet: PersistedCustomerWallet | null = null;
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (raw) {
+        const parsed = JSON.parse(raw) as PersistedCustomerWallet;
+        if (typeof parsed.availablePoints === 'number') {
+          cachedWallet = parsed;
+          setCustomerWalletSnapshot(parsed);
+          setLoyaltyPoints(parsed.availablePoints);
         }
-      } catch (err) {
-        console.warn('[App] Wallet fetch failed:', err instanceof Error ? err.message : err);
       }
-    })();
+    } catch {
+      // ignore localStorage errors
+    }
+
+    let initializedInFirestore = false;
+    const unsubscribeWallet = subscribeToCustomerWalletFull(customerUid, (liveWallet) => {
+      if (liveWallet) {
+        setCustomerWalletSnapshot(liveWallet);
+        setLoyaltyPoints(liveWallet.availablePoints);
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify(liveWallet));
+        } catch {
+          // ignore
+        }
+        return;
+      }
+
+      // First-ever visit for this signed-in user: create permanent Firestore wallet ONCE with 90 welcome points
+      if (!initializedInFirestore && currentUser && currentUser.uid === customerUid) {
+        initializedInFirestore = true;
+        const nowIso = new Date().toISOString();
+        const expiryIso = new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString();
+        const initialPoints = cachedWallet ? Math.min(125, Math.max(90, cachedWallet.availablePoints)) : 90;
+        const bootstrapWallet: PersistedCustomerWallet = {
+          customerId: customerUid,
+          customerName: customerProfile?.name || currentUser.displayName || undefined,
+          availablePoints: initialPoints,
+          totalEarnedPoints: cachedWallet?.totalEarnedPoints ?? initialPoints,
+          totalRedeemedPoints: cachedWallet?.totalRedeemedPoints ?? 0,
+          totalExpiredPoints: cachedWallet?.totalExpiredPoints ?? 0,
+          welcomeBonusClaimed: true,
+          completedOrdersCount: cachedWallet?.completedOrdersCount ?? 0,
+          claimedSocialPages: cachedWallet?.claimedSocialPages ?? [],
+          lastDailyLoginDate: cachedWallet?.lastDailyLoginDate,
+          nextExpirationDate: cachedWallet?.nextExpirationDate || expiryIso,
+          updatedAt: nowIso,
+        };
+        setCustomerWalletSnapshot(bootstrapWallet);
+        setLoyaltyPoints(initialPoints);
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify(bootstrapWallet));
+        } catch {
+          // ignore
+        }
+        void saveCustomerWalletToFirestore(bootstrapWallet);
+        void saveLoyaltyTransactionToFirestore({
+          id: `TXN-WELCOME-${customerUid.slice(0, 24)}`,
+          customerId: customerUid,
+          type: 'welcome_bonus',
+          points: 90,
+          equivalentFils: 90,
+          equivalentAed: 0.9,
+          note: 'نقاط ترحيبية عند الانضمام إلى فلاستر',
+          status: 'COMPLETED',
+          createdAt: nowIso,
+          expiryDate: expiryIso,
+        });
+      }
+    });
+
     return () => {
-      active = false;
+      unsubscribeWallet();
     };
-  }, [currentUser, customerProfile?.id]);
+  }, [currentUser, customerProfile?.id, customerProfile?.name]);
+
+  // Helper to apply and persist any loyalty points delta (order earn / redeem / refund) to Firestore + localStorage
+  const persistLoyaltyPointsDelta = (
+    deltaPoints: number,
+    txnType: string,
+    note: string,
+    relatedOrderId?: string
+  ) => {
+    const customerUid = currentUser?.uid || customerProfile?.id;
+    const nextPoints = Math.max(0, loyaltyPoints + deltaPoints);
+    setLoyaltyPoints(nextPoints);
+    setCustomerProfile((prev) => (prev ? { ...prev, loyaltyPoints: nextPoints } : prev));
+
+    if (!customerUid || customerUid === 'guest') return;
+    const nowIso = new Date().toISOString();
+    const expiryIso = new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString();
+    const base = customerWalletSnapshot;
+    const updatedWallet: PersistedCustomerWallet = {
+      customerId: customerUid,
+      customerName: customerProfile?.name || currentUser?.displayName || base?.customerName,
+      availablePoints: nextPoints,
+      totalEarnedPoints: (base?.totalEarnedPoints ?? loyaltyPoints) + (deltaPoints > 0 ? deltaPoints : 0),
+      totalRedeemedPoints: (base?.totalRedeemedPoints ?? 0) + (deltaPoints < 0 ? Math.abs(deltaPoints) : 0),
+      totalExpiredPoints: base?.totalExpiredPoints ?? 0,
+      welcomeBonusClaimed: base?.welcomeBonusClaimed ?? true,
+      completedOrdersCount: (base?.completedOrdersCount ?? 0) + (txnType === 'order_completion' ? 1 : 0),
+      claimedSocialPages: base?.claimedSocialPages ?? [],
+      lastDailyLoginDate: base?.lastDailyLoginDate,
+      nextExpirationDate: base?.nextExpirationDate || expiryIso,
+      updatedAt: nowIso,
+    };
+
+    setCustomerWalletSnapshot(updatedWallet);
+    try {
+      localStorage.setItem(`flaster_wallet_v2_${customerUid}`, JSON.stringify(updatedWallet));
+    } catch {
+      // ignore
+    }
+    void saveCustomerWalletToFirestore(updatedWallet);
+    void saveLoyaltyTransactionToFirestore({
+      id: `TXN-${txnType.toUpperCase()}-${Date.now()}`,
+      customerId: customerUid,
+      type: txnType,
+      points: deltaPoints,
+      equivalentFils: deltaPoints,
+      equivalentAed: Number((deltaPoints / 100).toFixed(2)),
+      note,
+      relatedOrderId,
+      status: 'COMPLETED',
+      createdAt: nowIso,
+      expiryDate: deltaPoints > 0 ? expiryIso : undefined,
+    });
+  };
 
   // Favorite toggle handler
   const handleToggleFavorite = (itemId: string) => {
@@ -351,9 +554,12 @@ export default function App() {
     });
   };
 
-  // Cart calculations
+  // Cart calculations (includes blended customer item price transparently)
   const cartCount = cartItems.reduce((acc, ci) => acc + ci.quantity, 0);
-  const cartTotal = cartItems.reduce((acc, ci) => acc + ci.item.discountedPrice * ci.quantity, 0);
+  const cartTotal = cartItems.reduce(
+    (acc, ci) => acc + getCustomerItemPriceAed(ci.item.discountedPrice) * ci.quantity,
+    0
+  );
 
   // Quick Add Item
   const handleQuickAdd = (item: SurplusItem) => {
@@ -465,13 +671,12 @@ export default function App() {
       customerId: customerUid,
       customerName: details.customerName,
       customerPhone: details.customerPhone,
-      deliveryAddress: details.deliveryAddress,
       merchantId: primaryMerchantId,
       items: itemsForOrder.map((ci) => ({
         itemId: ci.item.id,
         quantity: ci.quantity,
       })),
-      fulfillmentType: details.fulfillmentType,
+      fulfillmentType: 'pickup',
       paymentMethod: details.paymentMethod,
       paymentStatus: details.paymentStatus,
       paymentTransactionId: details.paymentTransactionId,
@@ -496,7 +701,14 @@ export default function App() {
       ? (serverRes.pointsRedeemed ?? 0)
       : (details.pointsRedeemed || 0);
     if (authoritativePointsRedeemed > 0) {
-      setLoyaltyPoints((prev) => Math.max(0, prev - authoritativePointsRedeemed));
+      persistLoyaltyPointsDelta(
+        -authoritativePointsRedeemed,
+        'order_redemption',
+        lang === 'ar'
+          ? `استبدال ${authoritativePointsRedeemed} نقطة كخصم في الطلب`
+          : `Redeemed ${authoritativePointsRedeemed} pts on order`,
+        serverRes.orderId
+      );
     }
 
     const fallback6Digit = Math.floor(100000 + Math.random() * 900000).toString();
@@ -518,6 +730,10 @@ export default function App() {
               idx === 0 && serverRes.success && typeof serverRes.subtotalFils === 'number'
                 ? serverRes.subtotalFils
                 : aedToFils(ci.item.discountedPrice) * ci.quantity;
+            const serviceFeeFils =
+              idx === 0 && serverRes.success && typeof serverRes.serviceFeeFils === 'number'
+                ? serverRes.serviceFeeFils
+                : CUSTOMER_SERVICE_FEE_FILS * Math.max(1, ci.quantity);
             const deliveryFeeFils = 0;
             const discountFils =
               idx === 0
@@ -528,7 +744,7 @@ export default function App() {
             const finalPaidFils =
               idx === 0 && serverRes.success && typeof serverRes.totalFils === 'number'
                 ? serverRes.totalFils
-                : Math.max(0, subtotalFils + deliveryFeeFils - discountFils);
+                : Math.max(0, subtotalFils + serviceFeeFils - discountFils);
             const finalPaid = filsToAed(finalPaidFils);
             const vatFils =
               idx === 0 && serverRes.success && typeof serverRes.vatFils === 'number'
@@ -550,6 +766,7 @@ export default function App() {
               invoiceNumber: formattedInv,
               receiptNumber: formattedInv,
               subtotalFils,
+              serviceFeeFils,
               deliveryFeeFils,
               pointsDiscountFils: discountFils,
               totalFils: finalPaidFils,
@@ -558,6 +775,7 @@ export default function App() {
               item: ci.item,
               quantity: ci.quantity,
               totalAed: finalPaid,
+              serviceFeeAed: filsToAed(serviceFeeFils),
               deliveryFeeAed: 0,
               pointsDiscountAed: filsToAed(discountFils),
               pointsRedeemed: idx === 0 ? authoritativePointsRedeemed : 0,
@@ -569,11 +787,10 @@ export default function App() {
               pickupDate: ci.item.pickupDate,
               status: 'active',
               workflowStatus: 'placed',
-              fulfillmentType: details.fulfillmentType,
+              fulfillmentType: 'pickup',
               customerId: customerUid,
               customerName: details.customerName,
               customerPhone: details.customerPhone,
-              deliveryAddress: details.deliveryAddress,
               paymentMethod: details.paymentMethod,
               paymentStatus: details.paymentStatus,
               paymentTransactionId: details.paymentTransactionId,
@@ -835,35 +1052,49 @@ export default function App() {
       prev.map((o) => (o.id === orderId ? { ...o, status: 'collected', workflowStatus: 'completed' } : o))
     );
 
-    // If user is logged in and hasn't claimed their 500 first-order welcome bonus yet, trigger it
+    // Award +15 points on completed order and save permanently to Firestore + localStorage
     if (!firstOrderBonusClaimed && (customerProfile || currentUser)) {
       setFirstOrderBonusClaimed(true);
       if (!bonusJustAwarded) {
-        setLoyaltyPoints((prev) => prev + 500);
-      }
-      if (customerProfile) {
-        setCustomerProfile((prev) => (prev ? { ...prev, loyaltyPoints: prev.loyaltyPoints + 500 } : prev));
+        persistLoyaltyPointsDelta(
+          15,
+          'order_completion',
+          lang === 'ar' ? 'مكافأة إتمام واستلام الطلب (+15 نقطة)' : 'Completed order reward (+15 pts)',
+          orderId
+        );
       }
       setLiveNotification({
-        title: lang === 'ar' ? '🎁 مبروك! ربحت 500 نقطة ترحيبية!' : '🎁 500 Welcome Points Unlocked!',
+        title: lang === 'ar' ? '🎁 مبروك! ربحت 15 نقطة إضافية للطلب المكتمل!' : '🎁 15 Points Earned for Completed Order!',
         body: lang === 'ar'
-          ? 'تمت إضافة 500 نقطة ترحيبية (5 دراهم) إلى محفظتك بمناسبة إتمام أول طلب لك بنجاح!'
-          : '500 welcome points (AED 5.00) have been credited to your wallet after completing your first order!'
+          ? 'تمت إضافة 15 نقطة إلى محفظتك وحفظها في حسابك بنجاح!'
+          : '15 loyalty points have been credited and saved to your wallet!'
       });
       setTimeout(() => setLiveNotification(null), 5500);
     }
   };
 
-  // Merchant Portal Handlers
+  // Merchant Portal Handlers (Synced live with Firestore items & backend catalog)
   const handleUpdateStock = (listingId: string, delta: number) => {
     setMerchantListings((prev) =>
       prev.map((item) =>
         item.id === listingId ? { ...item, stock: Math.max(0, item.stock + delta) } : item
       )
     );
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== listingId) return it;
+        const updated = { ...it, stockRemaining: Math.max(0, it.stockRemaining + delta) };
+        void saveSurplusItemToFirestore(updated);
+        void registerCatalogItemOnBackend(updated);
+        return updated;
+      })
+    );
   };
 
   const handleToggleStatus = (listingId: string) => {
+    setPausedListingIds((prev) =>
+      prev.includes(listingId) ? prev.filter((id) => id !== listingId) : [...prev, listingId]
+    );
     setMerchantListings((prev) =>
       prev.map((item) => {
         if (item.id === listingId) {
@@ -921,7 +1152,14 @@ export default function App() {
     );
 
     if (target.pointsRedeemed && target.pointsRedeemed > 0) {
-      setLoyaltyPoints((prev) => prev + target.pointsRedeemed!);
+      persistLoyaltyPointsDelta(
+        target.pointsRedeemed,
+        'order_refund',
+        lang === 'ar'
+          ? `استرجاع ${target.pointsRedeemed} نقطة بعد إلغاء الطلب ${target.code}`
+          : `Restored ${target.pointsRedeemed} pts for cancelled order ${target.code}`,
+        orderId
+      );
     }
 
     setLiveNotification({
@@ -933,25 +1171,42 @@ export default function App() {
     setTimeout(() => setLiveNotification(null), 4500);
   };
 
-  // Customer Authentication Success (0 points on signup; 500 points awarded after first completed order)
+  // Customer Authentication Success — preserve any existing saved points & show simple welcome message
   const handleCustomerAuthSuccess = (profile: CustomerProfile) => {
     setCustomerProfile(profile);
     setSavedAddresses(profile.savedAddresses);
-    setLoyaltyPoints(profile.loyaltyPoints);
+    setLoyaltyPoints((prev) => Math.max(prev, profile.loyaltyPoints || 0));
     setIsCustomerAuthOpen(false);
 
     setLiveNotification({
-      title: lang === 'ar' ? '🎉 تم توثيق رقم هاتفك بنجاح!' : '🎉 Phone Verified Successfully!',
+      title: lang === 'ar' ? '🎉 أهلاً بك في فلاستر!' : '🎉 Welcome to Flaster!',
       body: lang === 'ar'
-        ? 'أهلاً بك في فلاستر! أكمل طلبك الأول لتحصل فوراً على 500 نقطة ترحيبية (5 دراهم).'
-        : 'Welcome to Flaster! Complete your first order to unlock your 500 welcome points (AED 5.00).'
+        ? 'تم تسجيل دخولك بنجاح وإضافة نقاطك الترحيبية وحفظها تلقائياً في حسابك.'
+        : 'Welcome! Your welcome loyalty points have been added and saved automatically to your account.'
     });
     setTimeout(() => setLiveNotification(null), 5000);
   };
 
   const handleViewModeChange = (targetMode: 'consumer' | 'merchant' | 'admin') => {
     if (targetMode === 'merchant') {
-      if (isMerchantAuthenticated) {
+      if (isMerchantAuthenticated || isMasterFounder) {
+        if (!isMerchantAuthenticated) {
+          setIsMerchantAuthenticated(true);
+        }
+        if (!authenticatedMerchant && isMasterFounder) {
+          setAuthenticatedMerchant({
+            merchantId: merchantPartners[0]?.id || 'merchant-master',
+            username: 'master_admin',
+            name: merchantPartners[0]?.name || 'Master Founder',
+            nameAr: merchantPartners[0]?.nameAr || 'المدير العام',
+            phone: '+971500000000',
+            disabled: false,
+            failedAttempts: 0,
+            lockedUntil: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
         setViewMode('merchant');
       } else {
         setIsAuthModalOpen(true);
@@ -980,28 +1235,53 @@ export default function App() {
   };
 
   const handleAddMerchantListing = (newListingData: Omit<MerchantListing, 'id' | 'revenueAed'>) => {
-    const newId = `m-${Date.now()}`;
+    if (!newListingData.imageUrl || !newListingData.imageUrl.trim()) {
+      setLiveNotification({
+        title: lang === 'ar' ? '⚠️ صورة الصنف مطلوبة' : '⚠️ Product Photo Required',
+        body:
+          lang === 'ar'
+            ? 'يرجى رفع صورة حقيقية لصنف الطعام من جهازك قبل النشر.'
+            : 'Please upload a real photo of your food item before publishing.',
+      });
+      setTimeout(() => setLiveNotification(null), 4000);
+      return;
+    }
+
+    const sharedItemId = `item-${Date.now()}`;
+    const activePartner = merchantPartners.find(
+      (m) =>
+        authenticatedMerchant &&
+        (m.id === authenticatedMerchant.merchantId || m.username === authenticatedMerchant.username)
+    );
+
     const resolvedMerchantName =
-      authenticatedMerchant?.name || newListingData.merchantName || 'Waldorf Astoria Ras Al Khaimah';
+      activePartner?.name || authenticatedMerchant?.name || newListingData.merchantName || 'Flaster Partner';
     const resolvedMerchantNameAr =
+      activePartner?.nameAr ||
       authenticatedMerchant?.nameAr ||
       newListingData.merchantNameAr ||
       newListingData.merchantName ||
-      'فندق والدورف أستوريا رأس الخيمة';
-    const resolvedMerchantId = authenticatedMerchant?.merchantId || 'merchant-alsharisha-heritage';
+      'شريك فلاستر';
+    const resolvedMerchantId =
+      activePartner?.id || authenticatedMerchant?.merchantId || 'merchant-master';
+    const resolvedNeighborhood =
+      newListingData.neighborhood || activePartner?.neighborhood || 'Al Hamra Village';
+    const resolvedNeighborhoodAr =
+      newListingData.neighborhood || activePartner?.neighborhoodAr || activePartner?.neighborhood || 'رأس الخيمة';
 
     const newListing: MerchantListing = {
       ...newListingData,
       merchantName: resolvedMerchantName,
       merchantNameAr: resolvedMerchantNameAr,
-      id: newId,
+      neighborhood: resolvedNeighborhoodAr,
+      id: sharedItemId,
       revenueAed: 0,
     };
-    setMerchantListings((prev) => [newListing, ...prev]);
+    setMerchantListings((prev) => [newListing, ...prev.filter((l) => l.id !== sharedItemId)]);
 
-    // Also push a live SurplusItem to consumer catalog with expiryTime, allergens, and ingredients
+    // Push live food item to consumer catalog & Firestore with the exact uploaded photo
     const newSurplusItem: SurplusItem = {
-      id: `item-${Date.now()}`,
+      id: sharedItemId,
       title: {
         en: newListingData.title,
         ar: newListingData.titleAr || newListingData.title,
@@ -1011,23 +1291,26 @@ export default function App() {
         name: resolvedMerchantName,
         nameAr: resolvedMerchantNameAr,
         verified: true,
-        rating: 4.9,
-        reviewsCount: 180,
-        neighborhood: newListingData.neighborhood || 'Al Hamra Village',
-        neighborhoodAr: newListingData.neighborhood || 'قرية الحمراء',
-        distanceKm: 2.3,
-        avatar: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=120&auto=format&fit=crop&q=80',
-        address: `${newListingData.neighborhood || 'Al Hamra Village'}, Ras Al Khaimah`,
-        addressAr: `${newListingData.neighborhood || 'قرية الحمراء'}، رأس الخيمة`,
-        lat: 25.6882,
-        lng: 55.7794,
+        rating: activePartner?.rating || 4.9,
+        reviewsCount: 1,
+        neighborhood: resolvedNeighborhood,
+        neighborhoodAr: resolvedNeighborhoodAr,
+        distanceKm: 1.5,
+        avatar: activePartner?.avatar || newListingData.imageUrl,
+        address: activePartner?.address || `${resolvedNeighborhood}, Ras Al Khaimah`,
+        addressAr: activePartner?.addressAr || `${resolvedNeighborhoodAr}، رأس الخيمة`,
+        lat: activePartner?.lat ?? 25.7925,
+        lng: activePartner?.lng ?? 55.9555,
       },
       category: newListingData.category,
-      imageUrl: newListingData.imageUrl || (newListingData.category === 'bakery'
-        ? 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80'
-        : 'https://images.unsplash.com/photo-1555244162-803834f70033?w=800&auto=format&fit=crop&q=80'),
-      discountPercent: Math.round(
-        ((newListingData.originalPrice - newListingData.discountedPrice) / newListingData.originalPrice) * 100
+      imageUrl: newListingData.imageUrl,
+      discountPercent: Math.max(
+        5,
+        Math.round(
+          ((newListingData.originalPrice - newListingData.discountedPrice) /
+            Math.max(1, newListingData.originalPrice)) *
+            100
+        )
       ),
       originalPrice: newListingData.originalPrice,
       discountedPrice: newListingData.discountedPrice,
@@ -1040,23 +1323,24 @@ export default function App() {
       expiryTime: newListingData.expiryTime || new Date(Date.now() + 4 * 3600 * 1000).toISOString(),
       co2SavedKg: 2.8,
       description: {
-        en: 'Freshly broadcasted evening surplus box by kitchen chefs. Guaranteed hot, fresh, and gourmet quality.',
-        ar: 'بوكس فائض مسائي أطلقه طهاة المطبخ الآن. مضمون الجودة والطزاجة والنكهة الفاخرة.'
+        en: 'Freshly prepared food item crafted today by our kitchen chefs. Ready for self-pickup.',
+        ar: 'صنف طعام طازج أعدّه طهاة المطعم اليوم بأعلى معايير الجودة والنكهة، جاهز للاستلام المباشر.'
       },
       possibleContents: {
-        en: ['Assorted chef selection', 'Fresh side items', 'Artisan accompaniments'],
-        ar: ['تشكيلة طازجة من إعداد الشيف', 'أطباق جانبية', 'مقبلات حرفية']
+        en: ['Fresh chef-prepared dish', 'Original kitchen packaging'],
+        ar: ['وجبة طازجة من إعداد الشيف', 'تغليف صحي ومحكم من المطعم']
       },
       allergens: newListingData.allergens && newListingData.allergens.length > 0 ? newListingData.allergens : ['Gluten', 'Dairy'],
       ingredients: {
-        en: newListingData.ingredients || 'Fresh chef selection ingredients',
-        ar: newListingData.ingredientsAr || newListingData.ingredients || 'مكونات طازجة من اختيار الشيف'
+        en: newListingData.ingredients || 'Fresh kitchen ingredients',
+        ar: newListingData.ingredientsAr || newListingData.ingredients || 'مكونات طازجة يومياً'
       },
       isHalal: true,
-      tags: ['Live Broadcast', 'Kitchen Clearance']
+      tags: ['Fresh Food Item', 'Self-Pickup']
     };
 
-    setItems((prev) => [newSurplusItem, ...prev]);
+    setItems((prev) => [newSurplusItem, ...prev.filter((it) => it.id !== sharedItemId)]);
+    void saveSurplusItemToFirestore(newSurplusItem);
     void registerCatalogItemOnBackend(newSurplusItem);
   };
 
@@ -1066,7 +1350,7 @@ export default function App() {
       prev.map((item) => (item.id === listingId ? { ...item, ...updated } : item))
     );
 
-    // Sync changes to matching item in consumer catalog
+    // Sync changes to matching item in consumer catalog & Firestore
     setItems((prev) =>
       prev.map((it) => {
         const matchesId = it.id === listingId;
@@ -1084,7 +1368,7 @@ export default function App() {
           ? updated.pickupWindow.split('-')[1]?.trim() || it.pickupEnd
           : it.pickupEnd;
 
-        return {
+        const updatedItem: SurplusItem = {
           ...it,
           title: {
             en: updated.title || it.title.en,
@@ -1105,6 +1389,10 @@ export default function App() {
           pickupEnd: nextPickupEnd,
           expiryTime: updated.expiryTime || it.expiryTime,
         };
+
+        void saveSurplusItemToFirestore(updatedItem);
+        void registerCatalogItemOnBackend(updatedItem);
+        return updatedItem;
       })
     );
 
@@ -1121,21 +1409,100 @@ export default function App() {
   const handleDeleteMerchantListing = (listingId: string) => {
     const existingListing = merchantListings.find((l) => l.id === listingId);
     setMerchantListings((prev) => prev.filter((item) => item.id !== listingId));
-    if (existingListing) {
-      setItems((prev) =>
-        prev.filter(
-          (it) =>
-            it.id !== listingId &&
-            it.title.en !== existingListing.title &&
-            it.title.ar !== existingListing.titleAr
-        )
-      );
+    setPausedListingIds((prev) => prev.filter((id) => id !== listingId));
+    const matchingItemIds = items
+      .filter(
+        (it) =>
+          it.id === listingId ||
+          (existingListing &&
+            (it.title.en === existingListing.title || it.title.ar === existingListing.titleAr))
+      )
+      .map((it) => it.id);
+    if (matchingItemIds.length === 0) {
+      void deleteSurplusItemFromFirestore(listingId);
+    } else {
+      matchingItemIds.forEach((id) => {
+        void deleteSurplusItemFromFirestore(id);
+      });
     }
+    setItems((prev) =>
+      prev.filter(
+        (it) =>
+          it.id !== listingId &&
+          (!existingListing ||
+            (it.title.en !== existingListing.title && it.title.ar !== existingListing.titleAr))
+      )
+    );
   };
+
+  // Derive live Partner Portal listings directly from Firestore items + local listings for the active store
+  const derivedMerchantListings = React.useMemo<MerchantListing[]>(() => {
+    const activeMerchantId = authenticatedMerchant?.merchantId;
+    const activeName = authenticatedMerchant?.name;
+    const activeNameAr = authenticatedMerchant?.nameAr;
+
+    const matchingStoreItems = authenticatedMerchant
+      ? items.filter(
+          (it) =>
+            it.merchant.id === activeMerchantId ||
+            (activeName && it.merchant.name === activeName) ||
+            (activeNameAr && it.merchant.nameAr === activeNameAr)
+        )
+      : items;
+
+    const fromFirestore: MerchantListing[] = matchingStoreItems.map((it) => {
+      const itemSalesAed = orders
+        .filter((o) => o.status !== 'cancelled' && o.item?.id === it.id)
+        .reduce((sum, o) => sum + o.item.discountedPrice * o.quantity, 0);
+
+      return {
+        id: it.id,
+        title: it.title.en,
+        titleAr: it.title.ar,
+        merchantName: it.merchant.name,
+        merchantNameAr: it.merchant.nameAr,
+        neighborhood: it.merchant.neighborhoodAr || it.merchant.neighborhood,
+        category: it.category,
+        originalPrice: it.originalPrice,
+        discountedPrice: it.discountedPrice,
+        stock: it.stockRemaining,
+        initialStock: it.stockRemaining,
+        pickupWindow: `${it.pickupStart} - ${it.pickupEnd}`,
+        expiryTime: it.expiryTime,
+        imageUrl: it.imageUrl,
+        status:
+          it.stockRemaining <= 0
+            ? 'sold_out'
+            : pausedListingIds.includes(it.id)
+              ? 'paused'
+              : 'active',
+        revenueAed: Number(itemSalesAed.toFixed(2)),
+        allergens: it.allergens,
+        ingredients:
+          typeof it.ingredients === 'string' ? it.ingredients : it.ingredients?.en,
+        ingredientsAr:
+          typeof it.ingredients === 'string' ? it.ingredients : it.ingredients?.ar,
+      };
+    });
+
+    const firestoreIds = new Set(fromFirestore.map((l) => l.id));
+    const localExtras = merchantListings.filter((l) => {
+      if (firestoreIds.has(l.id)) return false;
+      if (!authenticatedMerchant) return true;
+      return (
+        !l.merchantName ||
+        l.merchantName === authenticatedMerchant.name ||
+        l.merchantNameAr === authenticatedMerchant.nameAr
+      );
+    });
+
+    return [...fromFirestore, ...localExtras];
+  }, [items, merchantListings, authenticatedMerchant, orders, pausedListingIds]);
 
   // Filter items for Consumer Marketplace with Smart RAK Proximity Fallback (at least 10 closest stores)
   const filteredItems = React.useMemo(() => {
     const baseList = items.filter((item) => {
+      if (pausedListingIds.includes(item.id)) return false;
       if (isSurplusItemExpired(item.expiryTime)) return false;
       if (showFavoritesOnly && !favorites.includes(item.id)) return false;
       if (selectedCategory !== 'all') {
@@ -1187,7 +1554,7 @@ export default function App() {
 
     const otherItems = baseList.filter((item) => !exactMatches.includes(item));
     return [...exactMatches, ...otherItems].slice(0, Math.max(10, exactMatches.length));
-  }, [items, selectedLocation, regions, selectedCategory, showFavoritesOnly, favorites, filterExpiringOnly, searchQuery]);
+  }, [items, pausedListingIds, selectedLocation, regions, selectedCategory, showFavoritesOnly, favorites, filterExpiringOnly, searchQuery]);
 
   const activeOrdersCount = orders.filter((o) => o.status === 'active').length;
   const rescuedMealsCount = orders.reduce((sum, o) => sum + o.quantity, 0);
@@ -1253,9 +1620,18 @@ export default function App() {
           setIsLegalModalOpen(true);
         }}
         onOpenPartnerModal={() => setIsPartnerModalOpen(true)}
-        onLogoutCustomer={() => {
+        onLogoutCustomer={async () => {
+          try {
+            await signOut();
+          } catch {
+            // ignore signOut failure
+          }
+          setPortalSessionToken(null);
           setCustomerProfile(null);
           setLoyaltyPoints(0);
+          setIsMerchantAuthenticated(false);
+          setAuthenticatedMerchant(null);
+          setViewMode('consumer');
           setLiveNotification({
             title: lang === 'ar' ? 'تم تسجيل الخروج' : 'Logged Out',
             body: lang === 'ar' ? 'يمكنك الدخول في أي وقت واستخدام رصيدك' : 'You can log back in anytime'
@@ -1277,6 +1653,8 @@ export default function App() {
             merchantPartners={merchantPartners}
             onUpdateMerchantCommission={handleUpdateMerchantCommission}
             onAddPartnerStore={handleAddPartnerStore}
+            onDeleteMerchant={handleDeleteMerchant}
+            onUpdateMerchantStatus={handleUpdateMerchantStatus}
             platformSettings={platformSettings}
             onUpdatePlatformSettings={setPlatformSettings}
             onSwitchToMarketplace={() => setViewMode('consumer')}
@@ -1290,25 +1668,46 @@ export default function App() {
       ) : viewMode === 'merchant' ? (
         <main className="flex-1">
           <MerchantWorkspace
-            listings={
-              authenticatedMerchant
-                ? merchantListings.filter(
-                    (l) =>
-                      !l.merchantName ||
-                      l.merchantName === authenticatedMerchant.name ||
-                      l.merchantNameAr === authenticatedMerchant.nameAr
-                  )
-                : merchantListings
-            }
+            listings={derivedMerchantListings}
             orders={
               authenticatedMerchant
-                ? orders.filter((o) => o.item?.merchant?.id === authenticatedMerchant.merchantId)
+                ? orders.filter(
+                    (o) =>
+                      o.item?.merchant?.id === authenticatedMerchant.merchantId ||
+                      o.item?.merchant?.name === authenticatedMerchant.name ||
+                      o.item?.merchant?.nameAr === authenticatedMerchant.nameAr
+                  )
                 : orders
             }
             lang={lang}
             regions={regions}
             categories={categories}
             authenticatedMerchant={authenticatedMerchant}
+            merchantPartners={
+              isMasterFounder
+                ? merchantPartners
+                : merchantPartners.filter(
+                    (m) => authenticatedMerchant && m.id === authenticatedMerchant.merchantId
+                  )
+            }
+            isMasterFounder={isMasterFounder}
+            onSelectMerchant={
+              isMasterFounder
+                ? (partner) =>
+                    setAuthenticatedMerchant({
+                      merchantId: partner.id,
+                      username: partner.username || partner.id.replace(/^merchant-/, ''),
+                      name: partner.name,
+                      nameAr: partner.nameAr,
+                      phone: partner.phone || '+971500000000',
+                      disabled: Boolean(partner.disabled),
+                      failedAttempts: 0,
+                      lockedUntil: 0,
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                    })
+                : undefined
+            }
             platformCommissionPercent={platformCommissionRate}
             onUpdateStock={handleUpdateStock}
             onToggleStatus={handleToggleStatus}
@@ -1324,6 +1723,12 @@ export default function App() {
       ) : (
         <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-8 w-full">
           
+          {/* Official Linktree Hub Banner (Follow Rewards Live Inside My Points Modal) */}
+          <SocialLinksRewardsBanner
+            lang={lang}
+            onOpenLoyalty={() => setIsLoyaltyOpen(true)}
+          />
+
           {/* Urgent Sunset Rescue Countdown Carousel */}
           <SunsetUrgencyBanner
             items={items}
@@ -1371,15 +1776,15 @@ export default function App() {
                   {showFavoritesOnly
                     ? (lang === 'ar' ? 'قائمتك المختارة من المطابخ المفضلة لمتابعة عروضها اليومية فور بثها' : 'Your curated list of favorite kitchens and artisan bakeries')
                     : isMapView
-                    ? (lang === 'ar' ? 'انقر على أي نقطة على الخريطة لمشاهدة بوكس الفائض وموعد استلامه' : 'Tap any pin on the map to inspect available surplus box')
+                    ? (lang === 'ar' ? 'انقر على أي نقطة على الخريطة لمشاهدة أصناف الطعام وموعد استلامها' : 'Tap any pin on the map to inspect available food items')
                     : (lang === 'ar'
-                      ? 'أطعمة فاخرة طازجة تُحجز بخصم 50% إلى 70% وتُستلم مباشرة من الكاونتر أو بتوصيل سريع'
-                      : 'Surplus gourmet food freshly prepared today, reserved at 50-70% discount')}
+                      ? 'أصناف طعام طازجة تُحجز بخصم 50% إلى 70% وتُستلم مباشرة من كاونتر المطعم'
+                      : 'Fresh gourmet food items prepared today, reserved at 50-70% off for self-pickup')}
                 </p>
               </div>
 
               <span className="font-metric text-xs font-semibold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 shadow-sm">
-                {filteredItems.length} {lang === 'ar' ? 'بوكس متوفر' : 'packs available'}
+                {filteredItems.length} {lang === 'ar' ? 'صنف متوفر' : 'items available'}
               </span>
             </div>
 
@@ -1563,8 +1968,18 @@ export default function App() {
         isOpen={isLoyaltyOpen}
         onClose={() => setIsLoyaltyOpen(false)}
         lang={lang}
-        customerId={customerProfile?.id || currentUser?.uid || 'guest'}
-        onPointsUpdated={(newPts) => setLoyaltyPoints(newPts)}
+        customerId={currentUser?.uid || customerProfile?.id || 'guest'}
+        currentPoints={loyaltyPoints}
+        customerName={customerProfile?.name || currentUser?.displayName || undefined}
+        isAuthenticated={Boolean((currentUser && !currentUser.isAnonymous) || customerProfile)}
+        onRequireAuth={() => {
+          setIsLoyaltyOpen(false);
+          setIsCustomerAuthOpen(true);
+        }}
+        onPointsUpdated={(newPts) => {
+          setLoyaltyPoints(newPts);
+          setCustomerProfile((prev) => (prev ? { ...prev, loyaltyPoints: newPts } : prev));
+        }}
       />
 
       <ImpactModal
@@ -1670,6 +2085,16 @@ export default function App() {
         onClose={() => setIsPartnerModalOpen(false)}
         lang={lang}
         onOpenKitchenDemo={() => setViewMode('merchant')}
+      />
+
+      {/* UAE PDPL Legal Consent Modal */}
+      <LegalConsentModal
+        isOpen={isLegalConsentOpen}
+        onAccept={() => {
+          localStorage.setItem('flaster_legal_accepted', 'true');
+          setIsLegalConsentOpen(false);
+        }}
+        lang={lang}
       />
 
     </div>

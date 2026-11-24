@@ -27,6 +27,8 @@ import {
 
 import { Language, DynamicRegion, CustomerProfile } from '../types';
 import { translations, LANGUAGE_OPTIONS } from '../translations';
+import { ADMIN_EMAIL_ALLOWLIST } from '../config/platformConfig';
+import { useAuth } from '../context/AuthContext';
 import { PWAInstallButton, OfflineIndicator } from './PWAInstallButton';
 import flasterLogoImg from '../assets/images/flaster_brand_logo_1794321576013.jpg';
 
@@ -81,6 +83,12 @@ export const Header: React.FC<HeaderProps> = ({
   onLogoutCustomer,
   onOpenPartnerModal,
 }) => {
+  const { currentUser } = useAuth();
+  const activeUserEmail = (customerProfile?.email || currentUser?.email || '').toLowerCase();
+  const isFounderAdmin = Boolean(
+    currentUser?.isAdmin ||
+    (activeUserEmail && ADMIN_EMAIL_ALLOWLIST.includes(activeUserEmail))
+  );
   const t = translations[lang];
   const isRtl = lang === 'ar' || lang === 'ur';
   const isArabic = lang === 'ar';
@@ -717,38 +725,48 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
                 </div>
 
-                {/* Group 3: الإدارة */}
+                {/* Group 3: الإدارة (General Admin & Reports visible ONLY to Master Founders) */}
+                {isFounderAdmin && (
+                  <div className="space-y-2">
+                    <div className="px-2 text-[11px] font-extrabold text-[#78716C] uppercase tracking-wider">
+                      {t.administrationGroup}
+                    </div>
+                    <div className="bg-[#FAF7F2] rounded-2xl border border-[#EAE4DC] divide-y divide-[#EAE4DC] overflow-hidden">
+                      <button
+                        type="button"
+                        {...bindTap(() => {
+                          setSidebarOpen(false);
+                          onViewModeChange('admin');
+                        })}
+                        style={{ pointerEvents: 'auto', touchAction: 'manipulation' }}
+                        className="pwa-touch-btn w-full text-start px-4 py-3 flex items-center gap-3 hover:bg-amber-50/60 text-[#1C1917] font-semibold transition-colors cursor-pointer"
+                      >
+                        <Settings className="w-4 h-4 text-amber-600 shrink-0 pointer-events-none" />
+                        <span className="pointer-events-none">{t.generalAdmin}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        {...bindTap(() => {
+                          setSidebarOpen(false);
+                          onViewModeChange('admin');
+                        })}
+                        style={{ pointerEvents: 'auto', touchAction: 'manipulation' }}
+                        className="pwa-touch-btn w-full text-start px-4 py-3 flex items-center gap-3 hover:bg-amber-50/60 text-[#1C1917] font-semibold transition-colors cursor-pointer"
+                      >
+                        <LayoutDashboard className="w-4 h-4 text-[#059669] shrink-0 pointer-events-none" />
+                        <span className="pointer-events-none">{t.adminReports}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Partner Portal («بوابة الشركاء») */}
                 <div className="space-y-2">
                   <div className="px-2 text-[11px] font-extrabold text-[#78716C] uppercase tracking-wider">
-                    {t.administrationGroup}
+                    {t.merchantPortal}
                   </div>
-                  <div className="bg-[#FAF7F2] rounded-2xl border border-[#EAE4DC] divide-y divide-[#EAE4DC] overflow-hidden">
-                    <button
-                      type="button"
-                      {...bindTap(() => {
-                        setSidebarOpen(false);
-                        onViewModeChange('admin');
-                      })}
-                      style={{ pointerEvents: 'auto', touchAction: 'manipulation' }}
-                      className="pwa-touch-btn w-full text-start px-4 py-3 flex items-center gap-3 hover:bg-amber-50/60 text-[#1C1917] font-semibold transition-colors cursor-pointer"
-                    >
-                      <Settings className="w-4 h-4 text-amber-600 shrink-0 pointer-events-none" />
-                      <span className="pointer-events-none">{t.generalAdmin}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      {...bindTap(() => {
-                        setSidebarOpen(false);
-                        onViewModeChange('admin');
-                      })}
-                      style={{ pointerEvents: 'auto', touchAction: 'manipulation' }}
-                      className="pwa-touch-btn w-full text-start px-4 py-3 flex items-center gap-3 hover:bg-amber-50/60 text-[#1C1917] font-semibold transition-colors cursor-pointer"
-                    >
-                      <LayoutDashboard className="w-4 h-4 text-[#059669] shrink-0 pointer-events-none" />
-                      <span className="pointer-events-none">{t.adminReports}</span>
-                    </button>
-
+                  <div className="bg-[#FAF7F2] rounded-2xl border border-[#EAE4DC] overflow-hidden">
                     <button
                       type="button"
                       {...bindTap(() => {
@@ -759,10 +777,16 @@ export const Header: React.FC<HeaderProps> = ({
                       className="pwa-touch-btn w-full text-start px-4 py-3 flex items-center justify-between hover:bg-amber-50/60 text-[#1C1917] font-semibold transition-colors cursor-pointer"
                     >
                       <div className="flex items-center gap-3 pointer-events-none">
-                        <Lock className="w-4 h-4 text-[#DC2626] shrink-0" />
+                        {isFounderAdmin ? (
+                          <Store className="w-4 h-4 text-[#059669] shrink-0" />
+                        ) : (
+                          <Lock className="w-4 h-4 text-[#DC2626] shrink-0" />
+                        )}
                         <span>{t.merchantPortal}</span>
                       </div>
-                      <Lock className="w-3.5 h-3.5 text-[#78716C] pointer-events-none" />
+                      {!isFounderAdmin && (
+                        <Lock className="w-3.5 h-3.5 text-[#78716C] pointer-events-none" />
+                      )}
                     </button>
                   </div>
                 </div>

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { SurplusItem, Language, DynamicRegion } from '../types';
 import { translations } from '../translations';
+import { getCustomerItemPriceAed } from '../config/platformConfig';
 
 interface InteractiveMapViewProps {
   items: SurplusItem[];
@@ -201,7 +202,7 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
           <div style="margin-top:2px;padding:1px 8px;border-radius:8px;font-size:10px;font-weight:800;white-space:nowrap;box-shadow:0 3px 8px rgba(0,0,0,0.25);background:${
             isSelected ? '#F59E0B' : '#1C1917'
           };color:${isSelected ? '#1C1917' : '#FDE68A'};border:1px solid #F59E0B;">
-            ${item.discountedPrice} ${t.currency}
+            ${getCustomerItemPriceAed(item.discountedPrice).toFixed(2)} ${t.currency}
           </div>
         </div>
       `,
@@ -765,8 +766,8 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                     <span className="text-[11px] text-[#A8A29E] line-through block">
                       {selectedItem.originalPrice} {t.currency}
                     </span>
-                    <span className="font-headline font-extrabold text-xl text-[#059669]">
-                      {selectedItem.discountedPrice}{' '}
+                    <span className="font-headline font-extrabold text-xl text-[#059669] tabular-nums">
+                      {getCustomerItemPriceAed(selectedItem.discountedPrice).toFixed(2)}{' '}
                       <span className="text-xs text-[#DC2626] font-bold">{t.currency}</span>
                     </span>
                   </div>
@@ -870,8 +871,8 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                       <h4 className="font-headline font-extrabold text-xs text-[#1C1917] truncate">
                         {isRtl ? item.merchant.nameAr : item.merchant.name}
                       </h4>
-                      <span className="font-metric font-extrabold text-xs text-[#059669] shrink-0">
-                        {item.discountedPrice} {t.currency}
+                      <span className="font-metric font-extrabold text-xs text-[#059669] shrink-0 tabular-nums">
+                        {getCustomerItemPriceAed(item.discountedPrice).toFixed(2)} {t.currency}
                       </span>
                     </div>
 

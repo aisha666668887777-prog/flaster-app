@@ -11,11 +11,14 @@ import { INITIAL_SURPLUS_ITEMS } from '../data/mockData.ts';
 import crypto from 'crypto';
 import { redeemPointsForOrder, refundRedeemedPoints, awardPurchaseReward } from './loyaltyService.ts';
 import {
+  CUSTOMER_SERVICE_FEE_AED,
+  CUSTOMER_SERVICE_FEE_FILS,
   calculateIncludedVatFils,
   filsToAed,
   formatSequentialInvoiceNumber,
 } from '../config/platformConfig.ts';
 import {
+  calculateOrderFinancials,
   getNextSequentialInvoiceNumber,
   getMerchantCommissionPercent,
 } from './financeService.ts';
@@ -51,6 +54,7 @@ export interface CreateOrderResult {
   pickupCode?: string;
   totalFils?: number;
   vatFils?: number;
+  serviceFeeFils?: number;
   deliveryFeeFils?: number;
   subtotalFils?: number;
   pointsRedeemed?: number;
@@ -76,6 +80,7 @@ export interface StoredServerOrder {
   deliveryAddress: string;
   merchantId: string;
   subtotalFils: number;
+  serviceFeeFils: number;
   deliveryFeeFils: number;
   pointsDiscountFils: number;
   pointsRedeemed: number;
@@ -125,40 +130,46 @@ export function getMerchantCatalogItems(merchantId?: string): SurplusItem[] {
   return all.filter((it) => it.merchant?.id === merchantId);
 }
 
-// Seed server order cache with initial demo order so Customer, Merchant, and Admin stay synced
-const initialSeedVatFils = calculateIncludedVatFils(5500);
-const INITIAL_DEMO_ORDER: StoredServerOrder = {
-  id: 'ord-initial-1',
-  invoiceNumber: formatSequentialInvoiceNumber(1001),
-  code: 'RAK-9281-WA',
-  pickupCode: '928104',
-  customerId: 'customer-rak-demo',
-  customerName: 'سعود المنصوري',
-  customerPhone: '+971 50 123 4567',
-  deliveryAddress: '',
-  merchantId: INITIAL_SURPLUS_ITEMS[0].merchant.id || 'merchant-alsharisha-heritage',
-  subtotalFils: 5500,
-  deliveryFeeFils: 0,
-  pointsDiscountFils: 0,
-  pointsRedeemed: 0,
-  vatFils: initialSeedVatFils,
-  totalFils: 5500,
-  fulfillmentType: 'pickup',
-  paymentMethod: 'apple_pay',
-  paymentStatus: 'paid',
-  paymentGateway: 'Ziina UAE',
-  status: 'placed',
-  workflowStatus: 'placed',
-  quantity: 1,
-  item: INITIAL_SURPLUS_ITEMS[0],
-  refundStatus: 'none',
-  createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-  updatedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-};
+function createEmptyFallbackItem(merchantId = 'flaster-partner'): SurplusItem {
+  return {
+    id: `fallback-${merchantId}`,
+    title: { en: 'Fresh Food Item', ar: 'صنف طعام طازج' },
+    merchant: {
+      id: merchantId,
+      name: 'Flaster Partner',
+      nameAr: 'شريك فلاستر',
+      verified: true,
+      rating: 5.0,
+      reviewsCount: 0,
+      neighborhood: 'Ras Al Khaimah',
+      neighborhoodAr: 'رأس الخيمة',
+      distanceKm: 0,
+      avatar: '',
+      address: 'Ras Al Khaimah, UAE',
+      addressAr: 'رأس الخيمة، الإمارات',
+      lat: 25.7925,
+      lng: 55.9555,
+    },
+    category: 'gourmet',
+    imageUrl: '',
+    discountPercent: 50,
+    originalPrice: 0,
+    discountedPrice: 0,
+    stockRemaining: 0,
+    pickupStart: '20:00',
+    pickupEnd: '22:00',
+    pickupDate: 'today',
+    co2SavedKg: 2.5,
+    description: { en: '', ar: '' },
+    possibleContents: { en: [], ar: [] },
+    allergens: [],
+    isHalal: true,
+    tags: [],
+  };
+}
 
-const serverOrdersCache = new Map<string, StoredServerOrder>([
-  [INITIAL_DEMO_ORDER.id, INITIAL_DEMO_ORDER],
-]);
+// Production clean slate: starts with zero fake demo orders
+const serverOrdersCache = new Map<string, StoredServerOrder>();
 const refundAuditLogs: RefundAuditLog[] = [];
 
 // Sync order payment status when verified Ziina/Stripe webhooks arrive
@@ -224,6 +235,7 @@ function toUiOrder(stored: StoredServerOrder): Order {
     customerPhone: stored.customerPhone,
     deliveryAddress: stored.deliveryAddress,
     subtotalFils: stored.subtotalFils,
+    serviceFeeFils: stored.serviceFeeFils ?? CUSTOMER_SERVICE_FEE_FILS,
     deliveryFeeFils: 0,
     pointsDiscountFils: stored.pointsDiscountFils,
     pointsRedeemed: stored.pointsRedeemed,
@@ -233,6 +245,7 @@ function toUiOrder(stored: StoredServerOrder): Order {
     item: stored.item,
     quantity: stored.quantity || 1,
     totalAed: filsToAed(stored.totalFils),
+    serviceFeeAed: filsToAed(stored.serviceFeeFils ?? CUSTOMER_SERVICE_FEE_FILS),
     deliveryFeeAed: 0,
     pointsDiscountAed: filsToAed(stored.pointsDiscountFils),
     co2SavedKg: Number(((stored.item?.co2SavedKg || 2.5) * (stored.quantity || 1)).toFixed(1)),
@@ -242,7 +255,7 @@ function toUiOrder(stored: StoredServerOrder): Order {
     pickupDate: stored.item?.pickupDate || 'today',
     status: isCancelled ? 'cancelled' : isCollected ? 'collected' : 'active',
     workflowStatus: wf,
-    fulfillmentType: stored.fulfillmentType || 'pickup',
+    fulfillmentType: 'pickup',
     paymentMethod: stored.paymentMethod || 'apple_pay',
     paymentStatus: stored.paymentStatus,
     paymentTransactionId: stored.paymentTransactionId,
@@ -268,7 +281,7 @@ export async function getAllOrdersSynced(filter?: {
       .limit(100)
       .get();
 
-    snap.forEach((docSnap) => {
+    snap.forEach((docSnap: any) => {
       const data = docSnap.data() as Record<string, unknown>;
       const id = String(data.id || docSnap.id);
       const existing = serverOrdersCache.get(id);
@@ -296,10 +309,10 @@ export async function getAllOrdersSynced(filter?: {
           (data.itemSnapshot as SurplusItem | undefined) ||
           (firstItem?.itemId ? serverCatalogItems.get(firstItem.itemId) : undefined) ||
           INITIAL_SURPLUS_ITEMS.find((it) => it.merchant.id === data.merchantId) ||
-          INITIAL_SURPLUS_ITEMS[0];
+          createEmptyFallbackItem(String(data.merchantId || 'flaster-partner'));
 
         const remoteStatus = String(data.status || 'placed');
-        const totalFils = Number(data.totalFils || matchedCatalogItem.discountedPriceFils || 2800);
+        const totalFils = Number(data.totalFils || matchedCatalogItem.discountedPriceFils || 0);
         const stored: StoredServerOrder = {
           id,
           invoiceNumber: String(data.invoiceNumber || formatSequentialInvoiceNumber(1001)),
@@ -310,14 +323,18 @@ export async function getAllOrdersSynced(filter?: {
           customerName: String(data.customerName || 'عميل فلاستر'),
           customerPhone: String(data.customerPhone || ''),
           deliveryAddress: String(data.deliveryAddress || ''),
-          merchantId: String(data.merchantId || matchedCatalogItem.merchant.id || 'merchant-waldorf'),
+          merchantId: String(data.merchantId || matchedCatalogItem.merchant.id || 'flaster-partner'),
           subtotalFils: Number(data.subtotalFils || totalFils),
+          serviceFeeFils:
+            typeof data.serviceFeeFils === 'number'
+              ? Number(data.serviceFeeFils)
+              : CUSTOMER_SERVICE_FEE_FILS,
           deliveryFeeFils: 0,
           pointsDiscountFils: Number(data.pointsDiscountFils || 0),
           pointsRedeemed: Number(data.pointsRedeemed || 0),
           vatFils: Number(data.vatFils || calculateIncludedVatFils(totalFils)),
           totalFils,
-          fulfillmentType: (data.fulfillmentType as FulfillmentType) || 'pickup',
+          fulfillmentType: 'pickup',
           paymentMethod:
             (data.paymentMethod as 'apple_pay' | 'credit_card' | 'pickup_cash') || 'apple_pay',
           paymentStatus: data.paymentStatus as StoredServerOrder['paymentStatus'],
@@ -348,12 +365,9 @@ export async function getAllOrdersSynced(filter?: {
     if (filter?.merchantId) {
       list = list.filter((o) => o.merchantId === filter.merchantId);
     } else if (filter?.customerId) {
-      list = list.filter(
-        (o) => o.customerId === filter.customerId || o.id === INITIAL_DEMO_ORDER.id
-      );
+      list = list.filter((o) => o.customerId === filter.customerId);
     } else {
-      // Unauthenticated fallback returns only the demo order
-      list = list.filter((o) => o.id === INITIAL_DEMO_ORDER.id);
+      list = [];
     }
   }
 
@@ -443,7 +457,7 @@ export async function validateAndProcessOrderRefund(params: {
         const fallbackItem =
           cachedOrder?.item ||
           (data.itemSnapshot as SurplusItem | undefined) ||
-          INITIAL_SURPLUS_ITEMS[0];
+          createEmptyFallbackItem(String(data.merchantId || 'flaster-partner'));
         cachedOrder = {
           id: orderId,
           invoiceNumber: data.invoiceNumber || `INV-2026-01001`,
@@ -455,12 +469,16 @@ export async function validateAndProcessOrderRefund(params: {
           deliveryAddress: data.deliveryAddress || '',
           merchantId: data.merchantId || '',
           subtotalFils: Number(data.subtotalFils || 0),
+          serviceFeeFils:
+            typeof data.serviceFeeFils === 'number'
+              ? Number(data.serviceFeeFils)
+              : CUSTOMER_SERVICE_FEE_FILS,
           deliveryFeeFils: 0,
           pointsDiscountFils: Number(data.pointsDiscountFils || 0),
           pointsRedeemed: Number(data.pointsRedeemed || 0),
           vatFils: Number(data.vatFils || 0),
           totalFils: Number(data.totalFils || 0),
-          fulfillmentType: data.fulfillmentType || 'pickup',
+          fulfillmentType: 'pickup',
           paymentMethod: data.paymentMethod || 'apple_pay',
           status: data.status || 'placed',
           workflowStatus: (data.workflowStatus || data.status || 'placed') as OrderWorkflowStatus,
@@ -798,10 +816,8 @@ export async function createOrderAtomic(params: CreateOrderParams): Promise<Crea
     customerId,
     customerName = 'Customer',
     customerPhone = '',
-    deliveryAddress = '',
     merchantId,
     items,
-    fulfillmentType,
     paymentMethod = 'apple_pay',
     paymentStatus,
     paymentTransactionId,
@@ -809,6 +825,9 @@ export async function createOrderAtomic(params: CreateOrderParams): Promise<Crea
     idempotencyKey,
     pointsToRedeem = 0,
   } = params;
+  // Self-pickup ONLY across the entire platform (no delivery option)
+  const effectiveFulfillmentType: FulfillmentType = 'pickup';
+  const deliveryAddress = '';
 
   if (!customerId) throw new Error('customerId is mandatory');
   if (!merchantId) throw new Error('merchantId is mandatory');
@@ -839,7 +858,7 @@ export async function createOrderAtomic(params: CreateOrderParams): Promise<Crea
         customerId,
         merchantId,
         items: Array.from(itemQuantities.entries()),
-        fulfillmentType,
+        fulfillmentType: effectiveFulfillmentType,
         pointsToRedeem,
       })
     )
@@ -963,8 +982,9 @@ export async function createOrderAtomic(params: CreateOrderParams): Promise<Crea
     });
   }
 
-  // Delivery is handled directly by each restaurant (0 AED platform fee)
+  // Self-pickup only (0 delivery fee) + Fixed immutable 1.50 AED (150 fils) per item blended into customer display price
   const deliveryFeeFils = 0;
+  const serviceFeeFils = CUSTOMER_SERVICE_FEE_FILS * Math.max(1, totalQuantity);
   const commissionPercent = getMerchantCommissionPercent(merchantId);
   const platformCommissionFils = Math.round((subtotalFils * commissionPercent) / 100);
   const merchantEarningsFils = subtotalFils - platformCommissionFils;
@@ -988,11 +1008,24 @@ export async function createOrderAtomic(params: CreateOrderParams): Promise<Crea
     actuallyRedeemedPoints = redemption.pointsRedeemed;
   }
 
-  const totalFils = Math.max(0, subtotalFils + deliveryFeeFils - pointsDiscountFils);
+  const totalFils = Math.max(0, subtotalFils + serviceFeeFils - pointsDiscountFils);
   const vatFils = calculateIncludedVatFils(totalFils);
   const orderCode = `RAK-${rawPickupCode.slice(0, 4)}`;
   const resolvedPaymentStatus =
     paymentStatus || (paymentMethod === 'pickup_cash' ? 'pending_cash' : 'paid');
+
+  // Record in finance ledger with fixed 1.50 AED service fee
+  calculateOrderFinancials({
+    orderId,
+    merchantId,
+    subtotalFils,
+    serviceFeeFils,
+    deliveryFeeFils: 0,
+    pointsDiscountFils,
+    commissionRatePercent: commissionPercent,
+    paymentMethod,
+    invoiceNumber,
+  });
 
   const storedOrder: StoredServerOrder = {
     id: orderId,
@@ -1008,12 +1041,13 @@ export async function createOrderAtomic(params: CreateOrderParams): Promise<Crea
     deliveryAddress,
     merchantId,
     subtotalFils,
+    serviceFeeFils,
     deliveryFeeFils: 0,
     pointsDiscountFils,
     pointsRedeemed: actuallyRedeemedPoints,
     vatFils,
     totalFils,
-    fulfillmentType,
+    fulfillmentType: effectiveFulfillmentType,
     paymentMethod,
     paymentStatus: resolvedPaymentStatus,
     paymentTransactionId,
@@ -1021,7 +1055,7 @@ export async function createOrderAtomic(params: CreateOrderParams): Promise<Crea
     status: 'placed',
     workflowStatus: 'placed',
     quantity: totalQuantity,
-    item: primaryItem || INITIAL_SURPLUS_ITEMS[0],
+    item: primaryItem || createEmptyFallbackItem(merchantId),
     refundStatus: 'none',
     createdAt: nowIso,
     updatedAt: nowIso,
@@ -1030,7 +1064,7 @@ export async function createOrderAtomic(params: CreateOrderParams): Promise<Crea
   registerOrderInServerCache(storedOrder);
 
   try {
-    await adminDb.runTransaction(async (transaction) => {
+    await adminDb.runTransaction(async (transaction: any) => {
       const idempotencyRef = adminDb.collection('idempotency_keys').doc(idempotencyKey);
       const idempotencyDoc = await transaction.get(idempotencyRef);
       if (idempotencyDoc.exists) {
@@ -1058,8 +1092,9 @@ export async function createOrderAtomic(params: CreateOrderParams): Promise<Crea
         deliveryAddress,
         merchantId,
         items: orderItemsSnapshot,
-        itemSnapshot: primaryItem || INITIAL_SURPLUS_ITEMS[0],
+        itemSnapshot: primaryItem || createEmptyFallbackItem(merchantId),
         subtotalFils,
+        serviceFeeFils,
         deliveryFeeFils: 0,
         platformCommissionFils,
         merchantEarningsFils,
@@ -1068,7 +1103,7 @@ export async function createOrderAtomic(params: CreateOrderParams): Promise<Crea
         platformLoyaltyExpenseFils: pointsDiscountFils,
         vatFils,
         totalFils,
-        fulfillmentType,
+        fulfillmentType: effectiveFulfillmentType,
         paymentMethod,
         paymentStatus: resolvedPaymentStatus,
         ...(paymentTransactionId ? { paymentTransactionId } : {}),
@@ -1111,11 +1146,16 @@ export async function createOrderAtomic(params: CreateOrderParams): Promise<Crea
     pickupCode: rawPickupCode,
     totalFils,
     vatFils,
+    serviceFeeFils,
     deliveryFeeFils: 0,
     subtotalFils,
     pointsRedeemed: actuallyRedeemedPoints,
     pointsDiscountFils,
-    order: toUiOrder(storedOrder),
+    order: {
+      ...toUiOrder(storedOrder),
+      serviceFeeFils,
+      serviceFeeAed: CUSTOMER_SERVICE_FEE_AED,
+    },
   };
 
   serverIdempotencyCache.set(idempotencyKey, {

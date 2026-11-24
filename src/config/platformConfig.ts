@@ -15,7 +15,7 @@ export interface PlatformSettings {
   defaultCommissionPercent: number; // 15% default
   minCommissionPercent: number; // 0%
   maxCommissionPercent: number; // 50%
-  welcomeBonusPoints: number; // 500 points awarded after first completed order
+  welcomeBonusPoints: number; // 90 points awarded upon signup
   pointsPerAed: number; // 100 points = 1 AED (1 point = 1 fil)
   sequentialInvoiceCounter: number;
 }
@@ -32,18 +32,56 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   defaultCommissionPercent: 15,
   minCommissionPercent: 0,
   maxCommissionPercent: 50,
-  welcomeBonusPoints: 500,
+  welcomeBonusPoints: 90,
   pointsPerAed: 100,
   sequentialInvoiceCounter: 1001,
 };
 
+// Platform Pricing & Fee Rules (Authoritative & Immutable)
+export const MIN_MERCHANT_ITEM_PRICE_AED = 15;
+export const MIN_MERCHANT_ITEM_PRICE_FILS = 1500; // 15.00 AED minimum merchant listing price
+export const CUSTOMER_SERVICE_FEE_AED = 1.5;
+export const CUSTOMER_SERVICE_FEE_FILS = 150; // 1.50 AED automatic platform fee blended silently into customer price
+export const MIN_REDEMPTION_POINTS = 1000; // 1,000 points = 10.00 AED minimum redemption
+
+// Official Flaster Social Hub (Linktree) & Follow-for-Points Rewards (5 platforms x 5 pts = 25 pts)
+export const SOCIAL_LINKTREE_URL = 'https://linktr.ee/flaster';
+export const SOCIAL_FOLLOW_POINTS_PER_PAGE = 5;
+export const SOCIAL_FOLLOW_PAGES = [
+  { id: 'instagram', nameAr: 'إنستغرام', nameEn: 'Instagram', url: SOCIAL_LINKTREE_URL },
+  { id: 'tiktok', nameAr: 'تيك توك', nameEn: 'TikTok', url: SOCIAL_LINKTREE_URL },
+  { id: 'snapchat', nameAr: 'سناب شات', nameEn: 'Snapchat', url: SOCIAL_LINKTREE_URL },
+  { id: 'facebook', nameAr: 'فيسبوك', nameEn: 'Facebook', url: SOCIAL_LINKTREE_URL },
+  { id: 'x', nameAr: 'إكس (تويتر)', nameEn: 'X (Twitter)', url: SOCIAL_LINKTREE_URL },
+] as const;
+
+export type SocialFollowPageId = (typeof SOCIAL_FOLLOW_PAGES)[number]['id'];
+
+/**
+ * Returns the final customer-facing item price in integer Fils (merchant price + fixed 1.50 AED platform fee).
+ * Blended seamlessly so the customer sees a single clean price with no separate service-fee line.
+ */
+export function getCustomerItemPriceFils(merchantPriceFils: number): number {
+  if (!Number.isFinite(merchantPriceFils) || merchantPriceFils <= 0) return CUSTOMER_SERVICE_FEE_FILS;
+  return Math.round(merchantPriceFils) + CUSTOMER_SERVICE_FEE_FILS;
+}
+
+/**
+ * Returns the final customer-facing item price in AED (merchant price + fixed 1.50 AED platform fee).
+ */
+export function getCustomerItemPriceAed(merchantPriceAed: number): number {
+  if (!Number.isFinite(merchantPriceAed) || merchantPriceAed <= 0) return CUSTOMER_SERVICE_FEE_AED;
+  return Number(((Math.round(merchantPriceAed * 100) + CUSTOMER_SERVICE_FEE_FILS) / 100).toFixed(2));
+}
+
 export const REFUND_POLICY_TEXT = {
   ar: 'سياسة الإلغاء والاسترداد: يُسمح بإلغاء الطلب واسترداد المبلغ كاملاً فقط طالما أن الطلب في حالة "تم الإرسال" (قبل قيام المتجر بقبول الطلب أو البدء في تحضيره). لا يُسمح بالإلغاء أو الاسترداد بعد قبول المتجر للطلب أو تحضيره أو استلامه.',
-  en: 'Cancellation & Refund Policy: Full order cancellation and refund are permitted strictly while the order is in "Placed" status (before the merchant accepts or starts preparing the order). Refunds are blocked once accepted, prepared, picked up, or delivered.',
+  en: 'Cancellation & Refund Policy: Full order cancellation and refund are permitted strictly while the order is in "Placed" status (before the merchant accepts or starts preparing the order). Refunds are blocked once accepted, prepared, or picked up.',
 };
 
 // Bootstrapped Admin Emails (Server & Client RBAC guard)
 export const ADMIN_EMAIL_ALLOWLIST: string[] = [
+  'flaster.ae@gmail.com',
   'aisha666668887777@gmail.com',
 ];
 

@@ -61,7 +61,7 @@ export const RestaurantPartnerModal: React.FC<RestaurantPartnerModalProps> = ({
         <div className="relative bg-gradient-to-r from-slate-950 via-slate-900 to-red-950 text-white p-6 sm:p-7 shrink-0">
           <button 
             onClick={onClose}
-            className="absolute top-4 end-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+            className="absolute top-4 end-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -78,8 +78,8 @@ export const RestaurantPartnerModal: React.FC<RestaurantPartnerModalProps> = ({
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed max-w-lg">
             {isArabic
-              ? 'انضم لمنصة «فلاستر» مجاناً 100%، وتخلص من خسائر الهدر الغذائي اليومي بنهاية كل وردية دون أي مجهود إضافي على طاقمك.'
-              : 'Zero upfront cost, zero monthly fees. Liquidate fresh end-of-day surplus with 15% success commission only.'}
+              ? 'انضم لمنصة فودكس وتخلص من خسائر الهدر الغذائي اليومي بنهاية كل وردية دون أي مجهود إضافي على طاقمك.'
+              : 'Join Fodex & Flaster platform to eliminate daily food waste losses at the end of every shift with zero extra effort.'}
           </p>
         </div>
 
@@ -98,7 +98,7 @@ export const RestaurantPartnerModal: React.FC<RestaurantPartnerModalProps> = ({
                     {isArabic ? 'حاسبة أرباح مطعمك التقديرية من الفائض' : 'Surplus Revenue Calculator'}
                   </h3>
                   <p className="text-[11px] text-[#64748B]">
-                    {isArabic ? 'كم يخسر مطعمك حالياً من رمي الطعام؟ وكم ستربح مع فلاستر؟' : 'See how much waste turns into pure profit'}
+                    {isArabic ? 'كم يخسر مطعمك حالياً من رمي الطعام؟ وكم ستربح معنا؟' : 'See how much waste turns into pure profit'}
                   </p>
                 </div>
               </div>
@@ -123,7 +123,7 @@ export const RestaurantPartnerModal: React.FC<RestaurantPartnerModalProps> = ({
 
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs font-bold text-[#0F172A]">
-                  <span>{isArabic ? 'متوسط سعر الصندوق:' : 'Average Box Price:'}</span>
+                  <span>{isArabic ? 'متوسط سعر الصنف:' : 'Average Item Price:'}</span>
                   <span className="font-metric text-[#DC2626] font-extrabold text-sm">{averagePrice} {isArabic ? 'درهم' : 'AED'}</span>
                 </div>
                 <input 
@@ -138,7 +138,7 @@ export const RestaurantPartnerModal: React.FC<RestaurantPartnerModalProps> = ({
               </div>
             </div>
 
-            {/* Profit Result Display */}
+            {/* Profit Result Display (Commission hidden from public view as requested) */}
             <div className="grid grid-cols-2 gap-3 pt-2 border-t border-amber-200/60">
               <div className="p-3 bg-white rounded-xl border border-slate-200 text-center shadow-xs">
                 <p className="text-[10px] font-bold text-[#64748B] uppercase">
@@ -147,8 +147,8 @@ export const RestaurantPartnerModal: React.FC<RestaurantPartnerModalProps> = ({
                 <p className="text-xl sm:text-2xl font-black text-emerald-600 font-headline mt-0.5">
                   +{netMonthlyProfit.toLocaleString()} <span className="text-xs font-bold">{isArabic ? 'درهم' : 'AED'}</span>
                 </p>
-                <p className="text-[9px] text-[#64748B] mt-0.5">
-                  {isArabic ? 'بعد خصم عمولة المنصة (15%)' : 'After 15% platform success fee'}
+                <p className="text-[9px] text-[#059669] font-bold mt-0.5">
+                  {isArabic ? 'عوائد مباشرة لخزينة المطعم' : 'Direct revenue to kitchen'}
                 </p>
               </div>
 
@@ -179,12 +179,12 @@ export const RestaurantPartnerModal: React.FC<RestaurantPartnerModalProps> = ({
                   1
                 </div>
                 <p className="font-extrabold text-xs text-[#0F172A]">
-                  {isArabic ? 'تحديد الأصناف الفائضة' : 'Select Surplus Items'}
+                  {isArabic ? 'فائض فطور، غداء أو عشاء' : 'Breakfast, Lunch & Dinner Surplus'}
                 </p>
                 <p className="text-[11px] text-[#64748B] leading-relaxed">
                   {isArabic 
-                    ? 'في نهاية اليوم، يحدد الشيف الأصناف الطازجة المتبقية بالاسم والصورة والكمية.'
-                    : 'Kitchen lists fresh daily surplus items with real names and quantities.'}
+                    ? 'من بداية اليوم أو خلال الوردية، يحدد الشيف الأصناف الفائضة الطازجة بكل مرونة وسرعة.'
+                    : 'From the start of the day or during shifts, chefs list fresh surplus items.'}
                 </p>
               </div>
 
@@ -193,11 +193,11 @@ export const RestaurantPartnerModal: React.FC<RestaurantPartnerModalProps> = ({
                   2
                 </div>
                 <p className="font-extrabold text-xs text-[#0F172A]">
-                  {isArabic ? 'تحديد الخصم والعدد' : 'Set Discount & Count'}
+                  {isArabic ? 'تحديد السعر والكمية' : 'Set Price & Count'}
                 </p>
                 <p className="text-[11px] text-[#64748B] leading-relaxed">
                   {isArabic 
-                    ? 'من الجوال بضغطة واحدة: تضع نسبة الخصم وساعات الاستلام المتاحة للزبائن.'
+                    ? 'من الجوال بضغطة واحدة: تضع السعر المخفض وساعات الاستلام المتاحة للزبائن.'
                     : '1-tap on mobile to set discount price and convenient pickup window.'}
                 </p>
               </div>
@@ -211,8 +211,8 @@ export const RestaurantPartnerModal: React.FC<RestaurantPartnerModalProps> = ({
                 </p>
                 <p className="text-[11px] text-[#64748B] leading-relaxed">
                   {isArabic 
-                    ? 'الزبون يدفع مقدماً بـ Apple Pay، ويستلم وجبته المحددة بالفرع أو عبر التوصيل.'
-                    : 'Customer pays upfront via Apple Pay and picks up item in designated window.'}
+                    ? 'الزبون يحجز عبر التطبيق، ويتوجه للمطعم لاستلام وجبته المحددة مباشرة من الكاونتر.'
+                    : 'Customer reserves in-app and picks up the item directly at your counter.'}
                 </p>
               </div>
             </div>
@@ -224,7 +224,7 @@ export const RestaurantPartnerModal: React.FC<RestaurantPartnerModalProps> = ({
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div>
                 <p className="font-bold text-[#0F172A]">{isArabic ? 'صفر تكاليف تأسيس أو اشتراك' : 'Zero Setup Fees'}</p>
-                <p className="text-[10px] text-slate-600">{isArabic ? 'مجاني 100%، عمولة نجاح 15% فقط عند البيع' : '100% free signup, 15% success fee on sold orders'}</p>
+                <p className="text-[10px] text-slate-600">{isArabic ? 'مجاني 100%، وتخلص تام من خسائر الهدر' : '100% free signup, zero waste losses'}</p>
               </div>
             </div>
 
@@ -255,30 +255,17 @@ export const RestaurantPartnerModal: React.FC<RestaurantPartnerModalProps> = ({
 
         </div>
 
-        {/* Modal Sticky Footer Actions */}
-        <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center gap-3">
+        {/* Modal Sticky Footer Actions (WhatsApp only, kitchen preview removed as requested) */}
+        <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50 flex items-center justify-center">
           <a
             href={whatsappHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full sm:flex-1 h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-headline font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 active:scale-98 transition-all"
+            className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-headline font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 active:scale-98 transition-all cursor-pointer"
           >
             <MessageCircle className="w-4 h-4" />
             <span>{isArabic ? 'تواصل معنا لتسجيل مطعمك (واتساب)' : 'Chat with Us to Register (WhatsApp)'}</span>
           </a>
-
-          {onOpenKitchenDemo && (
-            <button
-              onClick={() => {
-                onClose();
-                onOpenKitchenDemo();
-              }}
-              className="w-full sm:w-auto h-12 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 active:scale-98 transition-all"
-            >
-              <ChefHat className="w-4 h-4 text-amber-400" />
-              <span>{isArabic ? 'معاينة شاشة المطبخ' : 'Preview Kitchen'}</span>
-            </button>
-          )}
         </div>
 
       </div>

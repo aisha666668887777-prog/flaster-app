@@ -3,11 +3,9 @@ import {
   X,
   CreditCard,
   ShieldCheck,
-  Truck,
   Store,
   Lock,
   Sparkles,
-  MapPin,
   Phone,
   User,
   ArrowRight,
@@ -23,7 +21,13 @@ import {
   Order,
 } from '../types';
 import { translations } from '../translations';
-import { aedToFils, filsToAed, calculateIncludedVatFils } from '../config/platformConfig';
+import {
+  MIN_REDEMPTION_POINTS,
+  getCustomerItemPriceFils,
+  aedToFils,
+  filsToAed,
+  calculateIncludedVatFils,
+} from '../config/platformConfig';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -120,18 +124,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const t = translations[lang];
   const isArabic = lang === 'ar';
 
-  const defaultAddr = savedAddresses.find((a) => a.isDefault) || savedAddresses[0];
-
-  const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('pickup');
+  // Self-Pickup ONLY across the entire platform (no delivery)
+  const fulfillmentType: FulfillmentType = 'pickup';
   const [paymentMethod, setPaymentMethod] = useState<'apple_pay' | 'credit_card' | 'pickup_cash'>('apple_pay');
 
   const [customerName, setCustomerName] = useState(
     customerProfile?.name || (isArabic ? 'عميل فلاستر' : 'Flaster Customer')
   );
   const [customerPhone, setCustomerPhone] = useState(customerProfile?.phone || '+971 50 000 0000');
-  const [deliveryAddress, setDeliveryAddress] = useState(
-    defaultAddr ? `${defaultAddr.buildingOrVilla}, ${defaultAddr.street}, ${defaultAddr.city}` : ''
-  );
 
   // Card inputs (cleaned on open; validated via Luhn + future expiry + CVV)
   const [cardholderName, setCardholderName] = useState('');
@@ -164,35 +164,38 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       });
   }, [isOpen, customerProfile?.name, customerProfile?.phone]);
 
-  // Financial Calculations in integer fils (1 AED = 100 fils)
+  // Financial Calculations in integer fils (1 AED = 100 fils) — customer-facing price seamlessly includes platform fee
   const subtotalFils = itemsToBuy.reduce(
-    (sum, ci) => sum + aedToFils(ci.item.discountedPrice) * ci.quantity,
+    (sum, ci) => sum + getCustomerItemPriceFils(aedToFils(ci.item.discountedPrice)) * ci.quantity,
     0
   );
   const subtotal = filsToAed(subtotalFils);
-  // Direct restaurant self-delivery: 0 AED platform delivery fee
-  const deliveryFeeFils = 0;
 
   const maxPossiblePoints = Math.min(customerPointsBalance, 5000, subtotalFils);
+  const canRedeemPoints = customerPointsBalance >= MIN_REDEMPTION_POINTS && maxPossiblePoints >= MIN_REDEMPTION_POINTS;
   useEffect(() => {
-    if (maxPossiblePoints >= 100 && pointsToRedeem === 0) {
-      setPointsToRedeem(Math.min(maxPossiblePoints, 100));
-    } else if (maxPossiblePoints < 100) {
+    if (canRedeemPoints && pointsToRedeem < MIN_REDEMPTION_POINTS) {
+      setPointsToRedeem(MIN_REDEMPTION_POINTS);
+    } else if (!canRedeemPoints) {
       setPointsToRedeem(0);
       setApplyPoints(false);
     }
-  }, [maxPossiblePoints, pointsToRedeem]);
+  }, [canRedeemPoints, pointsToRedeem]);
 
   if (!isOpen || itemsToBuy.length === 0) return null;
 
-  const pointsDiscountFils = applyPoints && pointsToRedeem >= 100 ? Math.round(pointsToRedeem) : 0;
+  const pointsDiscountFils =
+    applyPoints && canRedeemPoints && pointsToRedeem >= MIN_REDEMPTION_POINTS
+      ? Math.round(pointsToRedeem)
+      : 0;
   const pointsDiscountAed = filsToAed(pointsDiscountFils);
-  const grandTotalFils = Math.max(0, subtotalFils + deliveryFeeFils - pointsDiscountFils);
+  const grandTotalFils = Math.max(0, subtotalFils - pointsDiscountFils);
   const grandTotal = filsToAed(grandTotalFils);
   const includedVatFils = calculateIncludedVatFils(grandTotalFils);
   const includedVatAed = filsToAed(includedVatFils);
 
   const hasLiveGateway = Boolean(gatewayStatus?.hasLiveGateway);
+  const usesHostedGateway = Boolean(gatewayStatus?.hasZiina || gatewayStatus?.hasStripe);
   const cardDigits = cardNumber.replace(/\D/g, '');
   const detectedBrand = detectCardBrand(cardNumber);
 
@@ -237,24 +240,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       return;
     }
 
-    if (fulfillmentType === 'delivery' && deliveryAddress.trim().length < 5) {
-      setPaymentError(
-        isArabic
-          ? 'يرجى كتابة عنوان التوصيل ليتمكن المطعم من إيصال الطلب إليك'
-          : 'Please enter a delivery address for the restaurant driver'
-      );
-      return;
-    }
-
-    // 1. Cash on Pickup / Direct Delivery
+    // 1. Cash on Pickup at Restaurant Counter
     if (paymentMethod === 'pickup_cash') {
       setIsProcessing(true);
       playSuccessChime();
       onPaymentSuccess({
-        fulfillmentType,
+        fulfillmentType: 'pickup',
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
-        deliveryAddress: fulfillmentType === 'delivery' ? deliveryAddress.trim() : undefined,
         paymentMethod: 'pickup_cash',
         pointsRedeemed: applyPoints ? pointsToRedeem : 0,
         pointsDiscountAed: applyPoints ? pointsDiscountAed : 0,
@@ -270,10 +263,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       setIsProcessing(true);
       playSuccessChime();
       onPaymentSuccess({
-        fulfillmentType,
+        fulfillmentType: 'pickup',
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
-        deliveryAddress: fulfillmentType === 'delivery' ? deliveryAddress.trim() : undefined,
         paymentMethod,
         pointsRedeemed: applyPoints ? pointsToRedeem : 0,
         pointsDiscountAed: applyPoints ? pointsDiscountAed : 0,
@@ -295,8 +287,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       return;
     }
 
-    // 4. Validate card inputs when paying by Credit/Debit Card in Sandbox mode
-    if (paymentMethod === 'credit_card' && !hasLiveGateway) {
+    // 4. Validate card inputs only when paying by Credit/Debit Card in local Sandbox mode
+    if (paymentMethod === 'credit_card' && !usesHostedGateway) {
       if (cardholderName.trim().length < 2) {
         setPaymentError(isArabic ? 'يرجى إدخال اسم حامل البطاقة' : 'Please enter the cardholder name');
         return;
@@ -364,10 +356,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             'flaster_pending_checkout',
             JSON.stringify({
               itemsToBuy,
-              fulfillmentType,
+              fulfillmentType: 'pickup',
               customerName: customerName.trim(),
               customerPhone: customerPhone.trim(),
-              deliveryAddress: fulfillmentType === 'delivery' ? deliveryAddress.trim() : undefined,
               paymentMethod,
               pointsRedeemed: applyPoints ? pointsToRedeem : 0,
               pointsDiscountAed: applyPoints ? pointsDiscountAed : 0,
@@ -406,10 +397,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
       playSuccessChime();
       onPaymentSuccess({
-        fulfillmentType,
+        fulfillmentType: 'pickup',
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
-        deliveryAddress: fulfillmentType === 'delivery' ? deliveryAddress.trim() : undefined,
         paymentMethod,
         pointsRedeemed: applyPoints ? pointsToRedeem : 0,
         pointsDiscountAed: applyPoints ? pointsDiscountAed : 0,
@@ -515,69 +505,30 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
           </div>
 
-          {/* Fulfillment Type Toggle (Self-Pickup vs Direct Restaurant Delivery) */}
+          {/* Fulfillment Method: Strictly Self-Pickup Only (No Delivery) */}
           <div className="space-y-2">
             <label className="block font-bold text-[#0F172A] text-xs">
-              {t.fulfillmentMethod}:
+              {isArabic ? 'طريقة الاستلام (استلام شخصي من المطعم فقط):' : 'Collection Method (Self-Pickup Only):'}
             </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setFulfillmentType('pickup')}
-                className={`p-3.5 rounded-xl border text-start transition-all flex flex-col gap-1.5 cursor-pointer ${
-                  fulfillmentType === 'pickup'
-                    ? 'border-[#059669] bg-emerald-50/70 text-emerald-950 ring-2 ring-emerald-500/20'
-                    : 'border-slate-200 bg-white hover:bg-slate-50 text-[#64748B]'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <Store
-                    className={`w-4 h-4 ${
-                      fulfillmentType === 'pickup' ? 'text-[#059669]' : 'text-slate-400'
-                    }`}
-                  />
-                  <span className="font-metric font-bold text-[11px] text-[#059669] bg-emerald-100 px-2 py-0.5 rounded-full">
-                    {isArabic ? 'مجاناً' : 'Free'}
-                  </span>
-                </div>
-                <div>
+            <div className="p-3.5 rounded-xl border border-[#059669] bg-emerald-50/70 text-emerald-950 ring-2 ring-emerald-500/15 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-100 text-[#059669] flex items-center justify-center shrink-0 mt-0.5">
+                <Store className="w-5 h-5" />
+              </div>
+              <div className="flex-1 space-y-1">
+                <div className="flex items-center justify-between gap-2">
                   <p className="font-bold text-xs text-[#0F172A]">
-                    {isArabic ? 'استلام ذاتي من المحل' : 'Self-Pickup'}
+                    {isArabic ? 'استلام شخصي مباشر من المطعم فقط' : 'Direct Self-Pickup at Restaurant Only'}
                   </p>
-                  <p className="text-[10px] text-[#64748B] mt-0.5">
-                    {isArabic ? 'استلم من الكاونتر مع كود QR' : 'Collect directly at counter'}
-                  </p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFulfillmentType('delivery')}
-                className={`p-3.5 rounded-xl border text-start transition-all flex flex-col gap-1.5 cursor-pointer ${
-                  fulfillmentType === 'delivery'
-                    ? 'border-orange-500 bg-orange-50/70 text-stone-900 ring-2 ring-orange-500/20'
-                    : 'border-[#EAE4DC] bg-[#FFFDF9] hover:bg-amber-50/50 text-[#78716C]'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <Truck
-                    className={`w-4 h-4 ${
-                      fulfillmentType === 'delivery' ? 'text-orange-600' : 'text-stone-400'
-                    }`}
-                  />
-                  <span className="font-metric font-bold text-[11px] text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
-                    0 {t.currency}
+                  <span className="font-metric font-bold text-[10px] text-[#059669] bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-full">
+                    {isArabic ? 'لا يوجد توصيل' : 'No Delivery'}
                   </span>
                 </div>
-                <div>
-                  <p className="font-bold text-xs text-[#1C1917]">{t.expressDelivery}</p>
-                  <p className="text-[10px] text-[#78716C] mt-0.5">
-                    {isArabic
-                      ? 'يوصلها المطعم بنفسه (0 د.إ رسوم منصة)'
-                      : 'Delivered directly by restaurant (0 AED platform fee)'}
-                  </p>
-                </div>
-              </button>
+                <p className="text-[11px] text-emerald-900 leading-relaxed">
+                  {isArabic
+                    ? 'احجز وجبتك الآن من التطبيق، ثم توجّه مباشرة إلى كاونتر المطعم خلال وقت الاستلام وأبرز كود QR أو الرمز السري لاستلام طلبك.'
+                    : 'Reserve your meal in the app, then head directly to the restaurant counter during the pickup window with your QR code.'}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -600,7 +551,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </div>
               </div>
 
-              {customerPointsBalance >= 100 ? (
+              {canRedeemPoints ? (
                 <button
                   type="button"
                   onClick={() => setApplyPoints(!applyPoints)}
@@ -620,12 +571,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </button>
               ) : (
                 <span className="text-[10px] font-semibold text-stone-500 bg-stone-200 px-2 py-0.5 rounded-full">
-                  {isArabic ? 'الحد الأدنى 100 نقطة' : 'Min 100 pts'}
+                  {isArabic ? `الحد الأدنى ${MIN_REDEMPTION_POINTS} نقطة` : `Min ${MIN_REDEMPTION_POINTS} pts`}
                 </span>
               )}
             </div>
 
-            {applyPoints && customerPointsBalance >= 100 && (
+            {applyPoints && canRedeemPoints && (
               <div className="pt-2 border-t border-amber-200/80 space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-stone-700 font-medium">
@@ -638,8 +589,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
                 <input
                   type="range"
-                  min={100}
-                  max={Math.max(100, maxPossiblePoints)}
+                  min={MIN_REDEMPTION_POINTS}
+                  max={Math.max(MIN_REDEMPTION_POINTS, maxPossiblePoints)}
                   step={50}
                   value={pointsToRedeem}
                   onChange={(e) => setPointsToRedeem(Number(e.target.value))}
@@ -647,7 +598,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 />
 
                 <div className="flex items-center justify-between text-[10px] text-slate-500 font-metric">
-                  <span>100 {isArabic ? 'نقطة (1 درهم)' : 'pts (1 AED)'}</span>
+                  <span>
+                    {MIN_REDEMPTION_POINTS}{' '}
+                    {isArabic
+                      ? `نقطة (${(MIN_REDEMPTION_POINTS / 100).toFixed(0)} دراهم)`
+                      : `pts (${(MIN_REDEMPTION_POINTS / 100).toFixed(0)} AED)`}
+                  </span>
                   <span>
                     {maxPossiblePoints} {isArabic ? 'نقطة (الحد الأقصى)' : 'pts (Max)'}
                   </span>
@@ -702,56 +658,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </div>
               </div>
             </div>
-
-            {fulfillmentType === 'delivery' && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-semibold text-[#0F172A]">
-                    {t.deliveryAddressLabel}
-                  </label>
-                  {savedAddresses.length > 0 && (
-                    <span className="text-[10px] text-[#64748B]">
-                      {isArabic ? 'أو اختر من عناويني المحفوظة' : 'Or select saved'}
-                    </span>
-                  )}
-                </div>
-
-                {savedAddresses.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pb-1">
-                    {savedAddresses.map((addr) => (
-                      <button
-                        key={addr.id}
-                        type="button"
-                        onClick={() =>
-                          setDeliveryAddress(`${addr.buildingOrVilla}, ${addr.street}, ${addr.city}`)
-                        }
-                        className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-amber-100 border border-slate-200 hover:border-amber-400 text-[10px] font-semibold text-slate-800 transition-colors flex items-center gap-1 cursor-pointer"
-                      >
-                        <MapPin className="w-2.5 h-2.5 text-[#DC2626]" />
-                        <span>
-                          {addr.label} ({addr.city})
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={deliveryAddress}
-                    onChange={(e) => setDeliveryAddress(e.target.value)}
-                    placeholder={
-                      isArabic
-                        ? 'اسم الشارع، رقم المبنى / الفيلا'
-                        : 'Street name, Building / Villa number'
-                    }
-                    className="w-full h-10 ps-8 pe-3 bg-white border border-[#CBD5E1] rounded-lg text-xs text-[#0F172A] focus:outline-none focus:border-[#DC2626]"
-                  />
-                  <MapPin className="w-3.5 h-3.5 text-slate-400 absolute start-2.5 top-3.5" />
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Payment Method Selector */}
@@ -762,9 +668,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
             {!hasLiveGateway && (
               <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] leading-relaxed">
-                {isArabic
-                  ? 'وضع الاختبار (Sandbox): يمكنك تجربة Apple Pay وبطاقة الائتمان الآن. وعند إضافة مفتاح ZIINA_API_TOKEN أو STRIPE_SECRET_KEY سيتم التحويل التلقائي للبوابة الحية.'
-                  : 'Sandbox Mode: Test Apple Pay and card validation safely. Add ZIINA_API_TOKEN or STRIPE_SECRET_KEY in Secrets to enable live charges.'}
+                {usesHostedGateway
+                  ? (isArabic
+                      ? 'وضع التجربة (Test Mode): هذه عملية دفع تجريبية عبر بوابة زينة ولن يتم خصم مبلغ حقيقي.'
+                      : 'Test Mode: This is a simulated Ziina checkout test and no real charge will be made.')
+                  : (isArabic
+                      ? 'وضع التجربة: يمكنك اختبار الدفع بالبطاقة أو Apple Pay بأمان دون خصم حقيقي، أو اختيار الدفع نقداً عند الاستلام.'
+                      : 'Test Mode: You can safely test Apple Pay or card checkout without real charges, or choose Cash on Pickup.')}
               </div>
             )}
 
@@ -860,7 +770,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   className="space-y-2.5 pt-2 border-t border-[#EAE4DC] text-xs"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {hasLiveGateway ? (
+                  {usesHostedGateway ? (
                     <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px]">
                       {isArabic
                         ? `سيتم توجيهك الآن إلى صفحة الدفع الآمنة المشفرة عبر ${gatewayStatus?.provider} لإدخال بيانات بطاقتك وإتمام الدفع.`
@@ -957,8 +867,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <p className="font-bold text-xs">{t.cashOnPickup}</p>
                   <p className="text-[10px] text-[#64748B]">
                     {isArabic
-                      ? 'ادفع نقداً أو ببطاقتك عند الاستلام أو لسائق المطعم'
-                      : 'Pay in cash or POS at counter or to restaurant driver'}
+                      ? 'ادفع نقداً أو ببطاقتك مباشرة عند الاستلام من المطعم'
+                      : 'Pay in cash or POS directly when picking up at the restaurant'}
                   </p>
                 </div>
               </div>
@@ -999,21 +909,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         <div className="p-5 border-t border-[#EAE4DC] bg-[#FAF7F2] space-y-3">
           <div className="space-y-1 font-metric text-xs">
             <div className="flex items-center justify-between text-[#78716C]">
-              <span>{isArabic ? 'قيمة الوجبات المحجوزة' : 'Items Subtotal'}</span>
-              <span>
+              <span>{isArabic ? 'قيمة الأصناف المحجوزة' : 'Items Subtotal'}</span>
+              <span className="tabular-nums">
                 {subtotal.toFixed(2)} {t.currency}
               </span>
             </div>
-            {fulfillmentType === 'delivery' && (
-              <div className="flex items-center justify-between text-emerald-700 font-semibold">
-                <span>
-                  {isArabic
-                    ? 'توصيل مباشر من المطعم (رسوم المنصة)'
-                    : 'Direct Restaurant Delivery (Platform Fee)'}
-                </span>
-                <span>0.00 {t.currency}</span>
-              </div>
-            )}
             {applyPoints && pointsDiscountAed > 0 && (
               <div className="flex items-center justify-between text-emerald-600 font-bold">
                 <span className="flex items-center gap-1">

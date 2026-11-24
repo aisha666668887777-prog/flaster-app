@@ -52,8 +52,8 @@ export const MerchantAuthModal: React.FC<MerchantAuthModalProps> = ({
       setError(true);
       setServerErrorMsg(
         isArabic
-          ? 'يرجى إدخال اسم المستخدم والرمز السري للمطعم.'
-          : 'Please enter both restaurant username and secret code.'
+          ? 'يرجى إدخال معرّف المتجر (ID) والرمز السري الخاص بمتجرك.'
+          : 'Please enter your Store ID (or username) and secret code.'
       );
       return;
     }
@@ -95,8 +95,8 @@ export const MerchantAuthModal: React.FC<MerchantAuthModalProps> = ({
         setServerErrorMsg(
           data.error ||
             (isArabic
-              ? 'بيانات الدخول غير صحيحة. يرجى التأكد من اسم المستخدم والرمز السري.'
-              : 'Invalid login credentials. Please check your username and secret code.')
+              ? 'بيانات الدخول غير صحيحة. يرجى التأكد من معرّف المتجر (ID) والرمز السري.'
+              : 'Invalid login credentials. Please check your Store ID and secret code.')
         );
         if (res.status === 429 && typeof data.retryAfterSeconds === 'number' && data.retryAfterSeconds > 0) {
           setLockoutTimer(data.retryAfterSeconds);
@@ -143,15 +143,15 @@ export const MerchantAuthModal: React.FC<MerchantAuthModalProps> = ({
         {/* Headline */}
         <div>
           <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold uppercase tracking-wider">
-            {isArabic ? 'حساب مستقل لكل مطعم 🔒' : 'Isolated Restaurant Account 🔒'}
+            {isArabic ? 'حساب مستقل لكل شريك 🔒' : 'Isolated Partner Account 🔒'}
           </span>
           <h3 className="font-headline font-extrabold text-lg text-[#1C1917] mt-1.5">
-            {isArabic ? 'دخول بوابة المطعم الشريك' : 'Partner Restaurant Login'}
+            {isArabic ? 'دخول بوابة الشركاء' : 'Partner Portal Login'}
           </h3>
           <p className="text-xs text-[#78716C] mt-1 leading-relaxed">
             {isArabic
-              ? 'أدخل اسم المستخدم والرمز السري المكون من 8 أرقام الخاص بمطعمك فقط.'
-              : 'Enter your dedicated restaurant username and 8-digit secret code.'}
+              ? 'أدخل معرّف المتجر (ID) والرمز السري المكون من 8 أرقام للدخول إلى متجرك فقط دون رؤية أي متجر آخر.'
+              : 'Enter your dedicated Store ID (or username) and 8-digit secret code to access only your store.'}
           </p>
         </div>
 
@@ -160,13 +160,13 @@ export const MerchantAuthModal: React.FC<MerchantAuthModalProps> = ({
           <div className="p-4 rounded-xl bg-red-50 border border-red-300 text-red-950 space-y-2 text-xs">
             <div className="flex items-center justify-center gap-1.5 font-bold text-red-700">
               <AlertTriangle className="w-4 h-4" />
-              <span>{isArabic ? 'تم حظر دخول هذا المطعم مؤقتاً!' : 'Restaurant Login Temporarily Locked'}</span>
+              <span>{isArabic ? 'تم حظر دخول هذا الشريك مؤقتاً!' : 'Partner Login Temporarily Locked'}</span>
             </div>
             <p className="text-[11px] text-red-800">
               {serverErrorMsg ||
                 (isArabic
-                  ? 'تم استنفاد 5 محاولات خاطئة متتالية لهذا الحساب. الحظر يسري لمدة 15 دقيقة على هذا المطعم فقط.'
-                  : '5 failed login attempts reached. This restaurant account is locked for 15 minutes.')}
+                  ? 'تم استنفاد 5 محاولات خاطئة متتالية لهذا الحساب. الحظر يسري لمدة 15 دقيقة على هذا المتجر فقط.'
+                  : '5 failed login attempts reached. This partner account is locked for 15 minutes.')}
             </p>
             <div className="flex items-center justify-center gap-1.5 font-metric font-extrabold text-sm text-red-700 pt-1">
               <Clock className="w-4 h-4" />
@@ -182,7 +182,7 @@ export const MerchantAuthModal: React.FC<MerchantAuthModalProps> = ({
               }}
               className="text-[11px] text-stone-600 hover:text-stone-900 underline pt-1 cursor-pointer"
             >
-              {isArabic ? 'التبديل إلى حساب مطعم آخر' : 'Switch to another restaurant account'}
+              {isArabic ? 'التبديل إلى حساب شريك آخر' : 'Switch to another partner account'}
             </button>
           </div>
         )}
@@ -192,14 +192,14 @@ export const MerchantAuthModal: React.FC<MerchantAuthModalProps> = ({
           <form onSubmit={handleSubmit} className="space-y-3.5 text-start">
             <div>
               <label className="block text-xs font-bold text-[#1C1917] mb-1">
-                {isArabic ? 'اسم المستخدم الخاص بالمطعم' : 'Restaurant Username'}
+                {isArabic ? 'معرّف المتجر (ID) أو اسم المستخدم' : 'Store ID or Partner Username'}
               </label>
               <div className="relative">
                 <input
                   type="text"
                   autoComplete="username"
                   dir="ltr"
-                  placeholder={isArabic ? 'مثال: alsharisha-heritage' : 'e.g. alsharisha-heritage'}
+                  placeholder={isArabic ? 'مثال: merchant-101 أو اسم المستخدم' : 'e.g. merchant-101 or username'}
                   value={username}
                   onChange={(e) => {
                     setUsername(e.target.value);
@@ -213,7 +213,7 @@ export const MerchantAuthModal: React.FC<MerchantAuthModalProps> = ({
 
             <div>
               <label className="block text-xs font-bold text-[#1C1917] mb-1">
-                {isArabic ? 'الرمز السري للمطعم (8 أرقام)' : 'Secret Access Code (8 digits)'}
+                {isArabic ? 'الرمز السري للشريك (8 أرقام)' : 'Secret Access Code (8 digits)'}
               </label>
               <div className="relative">
                 <input
@@ -250,8 +250,8 @@ export const MerchantAuthModal: React.FC<MerchantAuthModalProps> = ({
                   ? 'جاري التحقق على الخادم...'
                   : 'Verifying on server...'
                 : isArabic
-                  ? 'تسجيل الدخول لبوابة المطعم'
-                  : 'Sign In to Restaurant Portal'}
+                  ? 'تسجيل الدخول لبوابة الشركاء'
+                  : 'Sign In to Partner Portal'}
             </button>
           </form>
         )}
@@ -260,8 +260,8 @@ export const MerchantAuthModal: React.FC<MerchantAuthModalProps> = ({
         <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-[11px] text-emerald-900 font-semibold text-center">
           <span>
             {isArabic
-              ? '🛡️ كل مطعم معزول تماماً بتوكن موقّع (HMAC-SHA256) ولا يمكنه رؤية طلبات أي مطعم آخر'
-              : '🛡️ Strictly isolated per-merchant HMAC-SHA256 session'}
+              ? '🛡️ كل شريك معزول تماماً بتوكن موقّع (HMAC-SHA256) ولا يمكنه رؤية طلبات أي متجر آخر'
+              : '🛡️ Strictly isolated per-partner HMAC-SHA256 session'}
           </span>
         </div>
       </div>

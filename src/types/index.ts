@@ -139,12 +139,14 @@ export interface Order {
   quantity: number;
   // Integer UAE Fils (authoritative)
   subtotalFils?: number;
+  serviceFeeFils?: number;
   deliveryFeeFils?: number;
   pointsDiscountFils?: number;
   vatFils?: number;
   totalFils?: number;
   // Display AED fields
   totalAed: number;
+  serviceFeeAed?: number;
   deliveryFeeAed?: number;
   pointsDiscountAed?: number;
   pointsRedeemed?: number;

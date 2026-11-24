@@ -1,37 +1,21 @@
 import { auth } from './config';
 
-const PORTAL_TOKEN_STORAGE_KEY = 'flaster_portal_token';
+// Keep portal session tokens strictly in memory (avoid persisting stale tokens in browser storage)
 let inMemoryPortalToken: string | null = null;
 
 export function setPortalSessionToken(token: string | null): void {
   inMemoryPortalToken = token;
   try {
     if (typeof window !== 'undefined' && window.sessionStorage) {
-      if (token) {
-        window.sessionStorage.setItem(PORTAL_TOKEN_STORAGE_KEY, token);
-      } else {
-        window.sessionStorage.removeItem(PORTAL_TOKEN_STORAGE_KEY);
-      }
+      window.sessionStorage.removeItem('flaster_portal_token');
     }
   } catch {
-    // Ignore sessionStorage restrictions in sandboxed iframes
+    // Ignore storage cleanup restrictions
   }
 }
 
 export function getPortalSessionToken(): string | null {
-  if (inMemoryPortalToken) return inMemoryPortalToken;
-  try {
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      const stored = window.sessionStorage.getItem(PORTAL_TOKEN_STORAGE_KEY);
-      if (stored) {
-        inMemoryPortalToken = stored;
-        return stored;
-      }
-    }
-  } catch {
-    // Ignore storage read failure
-  }
-  return null;
+  return inMemoryPortalToken;
 }
 
 export async function getAuthHeaders(customerId?: string): Promise<Record<string, string>> {
@@ -40,12 +24,17 @@ export async function getAuthHeaders(customerId?: string): Promise<Record<string
   };
 
   try {
-    const token = await auth.currentUser?.getIdToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+    if (auth.currentUser) {
+      const token = await auth.currentUser.getIdToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
     }
   } catch (err) {
-    console.warn('[AuthHeaders] Failed to read Firebase ID token:', err instanceof Error ? err.message : err);
+    console.warn(
+      '[AuthHeaders] Failed to read Firebase ID token:',
+      err instanceof Error ? err.message : err
+    );
   }
 
   const portalToken = getPortalSessionToken();

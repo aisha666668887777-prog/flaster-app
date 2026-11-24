@@ -1,7 +1,10 @@
 import express from 'express';
 import {
   getCustomerLoyaltySummary,
+  hydrateWalletFromFirestore,
   claimDailyLoginReward,
+  claimSocialFollowReward,
+  revokeSocialFollowReward,
   awardReviewReward,
   claimNewUserWelcomeBonus,
   getPlatformRewardsLiabilityReport,
@@ -69,6 +72,7 @@ router.get('/wallet/:customerId', async (req, res) => {
     }
   }
 
+  await hydrateWalletFromFirestore(customerId);
   const summary = getCustomerLoyaltySummary(customerId);
   return res.json({ success: true, ...summary });
 });
@@ -76,13 +80,47 @@ router.get('/wallet/:customerId', async (req, res) => {
 /**
  * 2. POST /api/loyalty/daily-login
  */
-router.post('/daily-login', (req, res) => {
+router.post('/daily-login', async (req, res) => {
   const { customerId } = req.body || {};
   if (!customerId || typeof customerId !== 'string') {
     return res.status(400).json({ success: false, error: 'customerId مطلوب' });
   }
 
+  await hydrateWalletFromFirestore(customerId);
   const result = claimDailyLoginReward(customerId);
+  return res.json(result);
+});
+
+/**
+ * 2b. POST /api/loyalty/social-follow
+ * Awards 5 points per followed official Flaster platform (5 platforms max).
+ */
+router.post('/social-follow', async (req, res) => {
+  const { customerId, pageId, handle } = req.body || {};
+  if (!customerId || typeof customerId !== 'string' || !pageId || typeof pageId !== 'string') {
+    return res.status(400).json({ success: false, error: 'customerId و pageId مطلوبان' });
+  }
+
+  await hydrateWalletFromFirestore(customerId);
+  const result = claimSocialFollowReward(
+    customerId,
+    pageId,
+    typeof handle === 'string' ? handle : undefined
+  );
+  return res.json(result);
+});
+
+/**
+ * 2c. POST /api/loyalty/admin/revoke-social-follow (Admin only)
+ * Deducts 5 points if customer unfollowed the platform.
+ */
+router.post('/admin/revoke-social-follow', requireAdminAuth, async (req, res) => {
+  const { customerId, pageId } = req.body || {};
+  if (!customerId || typeof customerId !== 'string' || !pageId || typeof pageId !== 'string') {
+    return res.status(400).json({ success: false, error: 'customerId و pageId مطلوبان' });
+  }
+  await hydrateWalletFromFirestore(customerId);
+  const result = revokeSocialFollowReward(customerId, pageId);
   return res.json(result);
 });
 

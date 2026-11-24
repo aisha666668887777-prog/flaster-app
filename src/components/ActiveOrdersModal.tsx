@@ -9,7 +9,6 @@ import {
   Share2, 
   Receipt,
   RotateCcw,
-  Truck,
   Package,
   ShieldCheck
 } from 'lucide-react';
@@ -237,13 +236,7 @@ export const ActiveOrdersModal: React.FC<ActiveOrdersModalProps> = ({
                           {order.code}
                         </span>
                         <span>•</span>
-                        <span>{order.totalAed} {t.currency}</span>
-                        {order.fulfillmentType === 'delivery' && (
-                          <span className="text-sky-700 font-semibold flex items-center gap-0.5">
-                            <Truck className="w-3 h-3" />
-                            {isArabic ? 'توصيل' : 'Delivery'}
-                          </span>
-                        )}
+                        <span>{order.totalAed.toFixed(2)} {t.currency}</span>
                       </div>
                     </div>
 
@@ -314,7 +307,7 @@ export const ActiveOrdersModal: React.FC<ActiveOrdersModalProps> = ({
                         : activeOrder.status === 'collected' || activeOrder.workflowStatus === 'completed'
                         ? (isArabic ? 'مكتمل (Completed) ✓' : 'Completed ✓')
                         : activeOrder.workflowStatus === 'picked_up' || activeOrder.workflowStatus === 'delivered'
-                        ? (isArabic ? 'تم الاستلام / التوصيل' : 'Picked Up / Delivered')
+                        ? (isArabic ? 'تم الاستلام من المطعم' : 'Picked Up at Restaurant')
                         : activeOrder.workflowStatus === 'ready'
                         ? (isArabic ? 'جاهز للاستلام (Ready) 📦' : 'Ready for Pickup 📦')
                         : activeOrder.workflowStatus === 'accepted' || activeOrder.workflowStatus === 'preparing'

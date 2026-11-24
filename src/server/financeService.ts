@@ -5,6 +5,7 @@
 
 import { adminDb } from './adminAuth.ts';
 import {
+  CUSTOMER_SERVICE_FEE_FILS,
   DEFAULT_PLATFORM_SETTINGS,
   type PlatformSettings,
   calculateIncludedVatFils,
@@ -20,6 +21,7 @@ export interface TransactionFinancialBreakdown {
   invoiceNumber: string;
   merchantId: string;
   subtotalFils: number;
+  serviceFeeFils: number;
   deliveryFeeFils: number;
   vatFils: number; // Included 5% VAT = Math.round(totalCustomerPaidFils * 5 / 105)
   totalCustomerPaidFils: number;
@@ -67,60 +69,8 @@ const merchantCommissionsMap = new Map<string, MerchantPartner>(
 // Commission change audit logs synced with Firestore
 const commissionAuditLogs: CommissionAuditLog[] = [];
 
-// Transaction ledger synced with Firestore
-const transactionLedger: TransactionFinancialBreakdown[] = [
-  {
-    orderId: 'ORD-RAK-SEED-01',
-    invoiceNumber: 'INV-2026-01001',
-    merchantId: 'merchant-alsharisha-heritage',
-    subtotalFils: 3500, // 35.00 AED
-    deliveryFeeFils: 0, // 0.00 AED (Direct Merchant Delivery)
-    totalCustomerPaidFils: 3500, // 35.00 AED
-    vatFils: calculateIncludedVatFils(3500), // 3500 * 5 / 105 = 167 fils (1.67 AED)
-    commissionRatePercent: 15,
-    platformCommissionFils: 525,
-    merchantNetPayoutFils: 2975,
-    logisticsPayoutFils: 0,
-    platformLoyaltyFundedFils: 0,
-    paymentMethod: 'apple_pay',
-    isCashPayment: false,
-    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-  },
-  {
-    orderId: 'ORD-RAK-SEED-02',
-    invoiceNumber: 'INV-2026-01002',
-    merchantId: 'merchant-alnakheel-bakery',
-    subtotalFils: 2800, // 28.00 AED
-    deliveryFeeFils: 0,
-    totalCustomerPaidFils: 2800,
-    vatFils: calculateIncludedVatFils(2800), // 2800 * 5 / 105 = 133 fils (1.33 AED)
-    commissionRatePercent: 15,
-    platformCommissionFils: 420,
-    merchantNetPayoutFils: 2380,
-    logisticsPayoutFils: 0,
-    platformLoyaltyFundedFils: 0,
-    paymentMethod: 'apple_pay',
-    isCashPayment: false,
-    createdAt: new Date(Date.now() - 86400000 * 1).toISOString(),
-  },
-  {
-    orderId: 'ORD-RAK-SEED-03',
-    invoiceNumber: 'INV-2026-01003',
-    merchantId: 'merchant-alsharisha-heritage',
-    subtotalFils: 4500, // 45.00 AED
-    deliveryFeeFils: 0,
-    totalCustomerPaidFils: 4500,
-    vatFils: calculateIncludedVatFils(4500), // 4500 * 5 / 105 = 214 fils (2.14 AED)
-    commissionRatePercent: 15,
-    platformCommissionFils: 675,
-    merchantNetPayoutFils: 3825,
-    logisticsPayoutFils: 0,
-    platformLoyaltyFundedFils: 0,
-    paymentMethod: 'pickup_cash',
-    isCashPayment: true,
-    createdAt: new Date().toISOString(),
-  },
-];
+// Transaction ledger synced with Firestore (clean slate for production)
+const transactionLedger: TransactionFinancialBreakdown[] = [];
 
 export function getPlatformSettings(): PlatformSettings {
   return { ...currentPlatformSettings };
@@ -284,6 +234,10 @@ export function registerMerchantPartner(partner: MerchantPartner): MerchantPartn
   return merged;
 }
 
+export function removeMerchantPartner(merchantId: string): void {
+  merchantCommissionsMap.delete(merchantId);
+}
+
 export function getMerchantCommissionPercent(merchantId: string): number {
   const merchantPartner = merchantCommissionsMap.get(merchantId);
   const rawRate = merchantPartner?.commissionPercent ?? currentPlatformSettings.defaultCommissionPercent;
@@ -298,7 +252,8 @@ export function calculateOrderFinancials(params: {
   orderId: string;
   merchantId: string;
   subtotalFils: number;
-  deliveryFeeFils: number;
+  serviceFeeFils?: number;
+  deliveryFeeFils?: number;
   pointsDiscountFils?: number;
   commissionRatePercent?: number;
   paymentMethod?: string;
@@ -313,13 +268,17 @@ export function calculateOrderFinancials(params: {
   const rate = rateCheck.valid ? rateCheck.sanitizedRate : 15;
 
   const subtotalFils = Math.round(params.subtotalFils);
-  const deliveryFeeFils = Math.round(params.deliveryFeeFils || 0);
+  const serviceFeeFils =
+    typeof params.serviceFeeFils === 'number' && params.serviceFeeFils >= CUSTOMER_SERVICE_FEE_FILS
+      ? Math.round(params.serviceFeeFils)
+      : CUSTOMER_SERVICE_FEE_FILS; // Always >= 1.50 AED (150 fils), non-editable
+  const deliveryFeeFils = 0; // Self-pickup only (no delivery)
   const platformCommissionFils = Math.round((subtotalFils * rate) / 100);
   const merchantNetPayoutFils = subtotalFils - platformCommissionFils;
   const platformLoyaltyFundedFils = Math.round(params.pointsDiscountFils || 0);
   const totalCustomerPaidFils = Math.max(
     0,
-    subtotalFils + deliveryFeeFils - platformLoyaltyFundedFils
+    subtotalFils + serviceFeeFils - platformLoyaltyFundedFils
   );
 
   // Prices include 5% VAT -> VAT = total * 5 / 105
@@ -331,13 +290,14 @@ export function calculateOrderFinancials(params: {
     invoiceNumber: params.invoiceNumber || getNextSequentialInvoiceNumber(),
     merchantId: params.merchantId,
     subtotalFils,
+    serviceFeeFils,
     deliveryFeeFils,
     vatFils,
     totalCustomerPaidFils,
     commissionRatePercent: rate,
     platformCommissionFils,
     merchantNetPayoutFils,
-    logisticsPayoutFils: deliveryFeeFils,
+    logisticsPayoutFils: 0,
     platformLoyaltyFundedFils,
     paymentMethod: params.paymentMethod || 'apple_pay',
     isCashPayment,
@@ -372,22 +332,16 @@ export function getMerchantSettlementStatement(
     electronicSalesFils - totalPlatformCommissionFils
   );
 
-  const ibanMap: Record<string, string> = {
-    'merchant-alsharisha-heritage': 'AE120330000001234567890',
-    'merchant-alnakheel-bakery': 'AE980330000009876543210',
-    'merchant-alhamra-patisserie': 'AE450330000004561237890',
-    'merchant-waldorf': 'AE770330000007788991122',
-  };
-
-  const defaultIban = ibanMap[merchantId] || 'AE120330000001234567890';
+  const registeredPartner = merchantCommissionsMap.get(merchantId);
+  const defaultIban = registeredPartner?.iban || '';
 
   return {
     merchantId,
     merchantName:
       merchantName ||
-      (merchantId.includes('sharisha')
-        ? 'مطعم قصر الشريشة التراثي'
-        : 'مخبز وبوفيه النخيل الفاخر'),
+      registeredPartner?.nameAr ||
+      registeredPartner?.name ||
+      merchantId,
     statementPeriod: `الأسبوع الحالي (${new Date().toLocaleDateString('ar-AE', {
       day: 'numeric',
       month: 'short',
@@ -420,14 +374,16 @@ export function getPlatformFinancialSummary() {
     (sum, t) => sum + t.platformCommissionFils,
     0
   );
+  const totalServiceFeesFils = transactionLedger.reduce(
+    (sum, t) => sum + (t.serviceFeeFils ?? CUSTOMER_SERVICE_FEE_FILS),
+    0
+  );
+  const totalPlatformRevenueFils = totalCommissionFils + totalServiceFeesFils;
   const totalMerchantPayoutsFils = transactionLedger.reduce(
     (sum, t) => sum + t.merchantNetPayoutFils,
     0
   );
-  const totalLogisticsFeesFils = transactionLedger.reduce(
-    (sum, t) => sum + t.logisticsPayoutFils,
-    0
-  );
+  const totalLogisticsFeesFils = 0;
   const totalLoyaltyFundedFils = transactionLedger.reduce(
     (sum, t) => sum + t.platformLoyaltyFundedFils,
     0
@@ -445,14 +401,16 @@ export function getPlatformFinancialSummary() {
     totalGmvAed: filsToAed(totalGmvFils),
     totalVatFils,
     totalVatAed: filsToAed(totalVatFils),
-    totalPlatformRevenueFils: totalCommissionFils,
-    totalPlatformRevenueAed: filsToAed(totalCommissionFils),
+    totalServiceFeesFils,
+    totalServiceFeesAed: filsToAed(totalServiceFeesFils),
+    totalPlatformRevenueFils,
+    totalPlatformRevenueAed: filsToAed(totalPlatformRevenueFils),
     totalMerchantNetPayableFils: totalMerchantPayoutsFils,
     totalMerchantNetPayableAed: filsToAed(totalMerchantPayoutsFils),
     totalJeeblyLogisticsPaidAed: filsToAed(totalLogisticsFeesFils),
     totalPlatformLoyaltyExpenseAed: filsToAed(totalLoyaltyFundedFils),
-    commissionModel: '0-50% Validated Per-Merchant Rescue Commission',
-    logisticsModel: 'Direct Restaurant Self-Delivery & Counter Pickup (0 AED Platform Fee)',
+    commissionModel: '0-50% Validated Per-Merchant Commission + Fixed 1.50 AED Customer Service Fee',
+    logisticsModel: 'Self-Pickup Only at Restaurant Counter (No Delivery)',
     settlementPartner: 'Wio Bank PJSC - Wio Business Corporate IBAN Settlement',
     loyaltyFundingModel: '100% Platform Funded by Flaster (Zero Merchant Deductions)',
     settings: currentPlatformSettings,

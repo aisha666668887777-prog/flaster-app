@@ -9,10 +9,12 @@ import {
   createMerchantAccount,
   resetMerchantSecret,
   setMerchantAccountDisabled,
+  deleteMerchantAccount,
   listMerchantAccountsPublic,
   authenticateMerchantLogin,
 } from './adminAuth.ts';
-import { registerMerchantPartner } from './financeService.ts';
+import { registerMerchantPartner, removeMerchantPartner } from './financeService.ts';
+import { getOpsDashboardData } from './opsService.ts';
 
 const router = express.Router();
 
@@ -252,6 +254,24 @@ router.post('/merchants/:merchantId/status', requireAdminAuth, async (req, res) 
     const msg = err instanceof Error ? err.message : String(err);
     const status = msg.includes('MERCHANT_NOT_FOUND') ? 404 : 400;
     return res.status(status).json({ success: false, error: msg });
+  }
+});
+
+/**
+ * Admin-only: Permanently delete a restaurant account from server memory and Firestore
+ */
+router.delete('/merchants/:merchantId', requireAdminAuth, async (req, res) => {
+  try {
+    const { merchantId } = req.params;
+    await deleteMerchantAccount(merchantId);
+    removeMerchantPartner(merchantId);
+    return res.status(200).json({
+      success: true,
+      deletedMerchantId: merchantId,
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ success: false, error: msg });
   }
 });
 
@@ -505,6 +525,16 @@ router.post('/verify-whatsapp-otp', async (req, res) => {
     const msg = error instanceof Error ? error.message : 'Internal server error';
     return res.status(500).json({ success: false, error: msg });
   }
+});
+
+/**
+ * Admin-Only Operational Readiness, Security Logs & Service Status
+ */
+router.get('/ops-status', requireAdminAuth, (_req, res) => {
+  return res.status(200).json({
+    success: true,
+    ops: getOpsDashboardData(),
+  });
 });
 
 export default router;

@@ -23,76 +23,7 @@ export interface PilotStoreProfile {
   bankIbanVerified: boolean;
 }
 
-export const PILOT_STORES_RAK: PilotStoreProfile[] = [
-  {
-    merchantId: 'merchant-alsharisha-heritage',
-    name: 'Al Sharisha Heritage Kitchen & Restaurant',
-    nameAr: 'مطعم ومطبخ قصر الشريشة التراثي',
-    neighborhood: 'Al Sharisha',
-    neighborhoodAr: 'الشريشة - رأس الخيمة',
-    address: 'Near Al Sharisha Roundabout, Old City Road',
-    addressAr: 'بالقرب من دوار الشريشة، شارع المدينة القديمة',
-    contactPerson: 'الشيف بو راشد الشحي',
-    phone: '+971 7 222 8899',
-    status: 'READY_ACTIVE',
-    commissionRatePercent: 15,
-    dailyExpectedSurplusBoxes: 12,
-    pickupWindow: '20:30 - 22:30',
-    jeeblyExpressCoverage: true,
-    bankIbanVerified: true
-  },
-  {
-    merchantId: 'merchant-alnakheel-bakery',
-    name: 'Al Nakheel Luxury Bakery & Buffet',
-    nameAr: 'مخبز وبوفيه النخيل الفاخر',
-    neighborhood: 'Al Hamra Village',
-    neighborhoodAr: 'قرية الحمراء - رأس الخيمة',
-    address: 'Al Hamra Mall Promenade',
-    addressAr: 'ممشى مول الحمراء، رأس الخيمة',
-    contactPerson: 'ميشيل دوبونت (مدير المخبز)',
-    phone: '+971 7 244 1122',
-    status: 'READY_ACTIVE',
-    commissionRatePercent: 15,
-    dailyExpectedSurplusBoxes: 10,
-    pickupWindow: '21:00 - 22:45',
-    jeeblyExpressCoverage: true,
-    bankIbanVerified: true
-  },
-  {
-    merchantId: 'merchant-alhamra-patisserie',
-    name: 'Al Hamra Artisanal Pastries',
-    nameAr: 'باتيسيري وحلويات الحمراء الفاخرة',
-    neighborhood: 'Al Hamra Village',
-    neighborhoodAr: 'مارينا الحمراء - رأس الخيمة',
-    address: 'Al Hamra Marina Pier 2',
-    addressAr: 'مارينا الحمراء، الرصيف 2',
-    contactPerson: 'فاطمة النعيمي',
-    phone: '+971 7 244 5566',
-    status: 'READY_ACTIVE',
-    commissionRatePercent: 15,
-    dailyExpectedSurplusBoxes: 8,
-    pickupWindow: '20:00 - 22:00',
-    jeeblyExpressCoverage: true,
-    bankIbanVerified: true
-  },
-  {
-    merchantId: 'merchant-alwaha-fresh',
-    name: 'Al Waha Gourmet Deli & Fresh Market',
-    nameAr: 'سوبرماركت ومأكولات الواحة الطازجة',
-    neighborhood: 'Khuzam',
-    neighborhoodAr: 'خزام - رأس الخيمة',
-    address: 'Khuzam Main Avenue',
-    addressAr: 'شارع خزام الرئيسي، رأس الخيمة',
-    contactPerson: 'سالم الكعبي',
-    phone: '+971 7 233 7788',
-    status: 'READY_ACTIVE',
-    commissionRatePercent: 15,
-    dailyExpectedSurplusBoxes: 15,
-    pickupWindow: '21:30 - 23:00',
-    jeeblyExpressCoverage: true,
-    bankIbanVerified: true
-  }
-];
+export const PILOT_STORES_RAK: PilotStoreProfile[] = [];
 
 export interface PilotReadinessReport {
   overallStatus: 'OPERATIONAL_READY';

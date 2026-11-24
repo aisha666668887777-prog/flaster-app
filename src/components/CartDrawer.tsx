@@ -6,9 +6,11 @@ import {
   Clock,
   ArrowRight,
   Sparkles,
+  Store,
 } from 'lucide-react';
 import { CartItem, Language } from '../types';
 import { translations } from '../translations';
+import { getCustomerItemPriceFils, getCustomerItemPriceAed, aedToFils, filsToAed } from '../config/platformConfig';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -34,15 +36,17 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const t = translations[lang];
   const isArabic = lang === 'ar';
 
-  const subtotal = cartItems.reduce(
-    (sum, ci) => sum + ci.item.discountedPrice * ci.quantity,
+  const subtotalFils = cartItems.reduce(
+    (sum, ci) => sum + getCustomerItemPriceFils(aedToFils(ci.item.discountedPrice)) * ci.quantity,
     0
   );
+  const subtotal = filsToAed(subtotalFils);
   const totalRegular = cartItems.reduce(
     (sum, ci) => sum + ci.item.originalPrice * ci.quantity,
     0
   );
-  const totalSaved = totalRegular - subtotal;
+  const totalSaved = Math.max(0, Number((totalRegular - subtotal).toFixed(2)));
+  const grandTotal = subtotal;
 
   return (
     <div
@@ -179,10 +183,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                           {/* Price */}
                           <div className="text-end font-metric">
                             <span className="text-[10px] text-[#94A3B8] line-through block">
-                              {item.originalPrice * quantity} {t.currency}
+                              {(item.originalPrice * quantity).toFixed(2)} {t.currency}
                             </span>
-                            <span className="font-bold text-sm text-[#0F172A]">
-                              {item.discountedPrice * quantity} {t.currency}
+                            <span className="font-bold text-sm text-[#0F172A] tabular-nums">
+                              {(getCustomerItemPriceAed(item.discountedPrice) * quantity).toFixed(2)} {t.currency}
                             </span>
                           </div>
                         </div>
@@ -193,36 +197,37 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               </div>
 
               {/* Order note */}
-              <div className="p-3 bg-[#FAF7F2] rounded-xl border border-[#EAE4DC] text-[11px] text-[#78716C] space-y-1">
-                <p className="font-semibold text-[#1C1917]">
-                  ℹ️ {isArabic ? 'تأكيد الحجز الفوري' : 'Instant Order Confirmation'}
+              <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-200 text-[11px] text-emerald-950 space-y-1">
+                <p className="font-bold flex items-center gap-1.5 text-emerald-900">
+                  <Store className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>{isArabic ? 'استلام شخصي من المطعم فقط (لا يوجد توصيل)' : 'Self-Pickup at Restaurant Only (No Delivery)'}</span>
                 </p>
-                <p>{t.cartNotice}</p>
+                <p className="text-emerald-800">{t.cartNotice}</p>
               </div>
             </div>
           )}
         </div>
 
-        {/* Drawer Sticky Footer with Subtotal & Checkout */}
+        {/* Drawer Sticky Footer with Subtotal, Fixed Service Fee & Checkout */}
         {cartItems.length > 0 && (
           <div className="p-5 border-t border-[#EAE4DC] bg-[#FAF7F2] space-y-4">
             <div className="space-y-1.5 text-xs font-metric">
               <div className="flex items-center justify-between text-[#78716C]">
                 <span>{isArabic ? 'السعر الأصلي للمطعم' : 'Original Price'}</span>
                 <span className="line-through">
-                  {totalRegular} {t.currency}
+                  {totalRegular.toFixed(2)} {t.currency}
                 </span>
               </div>
               <div className="flex items-center justify-between text-[#059669] font-semibold">
                 <span>{t.totalSavings}</span>
                 <span>
-                  -{totalSaved} {t.currency}
+                  -{totalSaved.toFixed(2)} {t.currency}
                 </span>
               </div>
               <div className="flex items-center justify-between text-[#1C1917] font-extrabold text-base pt-2 border-t border-[#EAE4DC]">
-                <span>{isArabic ? 'إجمالي السلة' : 'Total'}</span>
-                <span className="text-xl text-[#ee5253] font-headline">
-                  {subtotal} {t.currency}
+                <span>{isArabic ? 'الإجمالي الكلي' : 'Total'}</span>
+                <span className="text-xl text-[#ee5253] font-headline tabular-nums">
+                  {grandTotal.toFixed(2)} {t.currency}
                 </span>
               </div>
             </div>

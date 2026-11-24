@@ -169,59 +169,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
             )}
           </div>
 
-          {/* Unified Categories Dropdown («الأقسام») */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              type="button"
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-              className={`flex items-center justify-between gap-2 px-4 h-11 rounded-xl text-xs font-extrabold transition-all border cursor-pointer shrink-0 ${
-                selectedCategory !== 'all' || dropdownOpen
-                  ? 'bg-[#DC2626] text-white border-[#DC2626] shadow-sm'
-                  : 'bg-[#FFFDF9] text-[#1C1917] border-[#EAE4DC] hover:border-[#DC2626] hover:bg-red-50/40'
-              }`}
-            >
-              <LayoutGrid className={`w-4 h-4 shrink-0 ${selectedCategory !== 'all' || dropdownOpen ? 'text-white' : 'text-[#DC2626]'}`} />
-              <span>
-                {selectedCategory === 'all' ? t.categoriesBtn : activeCategoryObj.label}
-              </span>
-              <ChevronDown
-                className={`w-4 h-4 transition-transform duration-200 ${
-                  dropdownOpen ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
 
-            {dropdownOpen && (
-              <div className="absolute start-0 mt-2 w-64 rounded-2xl bg-[#FFFDF9] border-2 border-amber-300 shadow-2xl py-2 z-[60] animate-in fade-in zoom-in-95 duration-150">
-                <div className="px-3.5 py-1.5 text-[11px] font-extrabold text-[#78716C] border-b border-[#EAE4DC]/70">
-                  {t.selectCategoryMenu}
-                </div>
-                <div className="py-1">
-                  {unifiedCategories.map((cat) => {
-                    const isSelected = selectedCategory === cat.id && !showFavoritesOnly;
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => {
-                          onSelectCategory(cat.id);
-                          setDropdownOpen(false);
-                        }}
-                        className={`w-full text-start px-4 py-2.5 text-xs flex items-center justify-between transition-colors cursor-pointer ${
-                          isSelected
-                            ? 'bg-amber-50 text-[#DC2626] font-extrabold'
-                            : 'text-[#1C1917] font-semibold hover:bg-[#FAF7F2]'
-                        }`}
-                      >
-                        <span>{cat.label}</span>
-                        {isSelected && <Check className="w-4 h-4 text-[#059669]" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
 
           {/* Restaurant Map Button («خريطة المطاعم») */}
           <button

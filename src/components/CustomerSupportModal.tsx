@@ -7,6 +7,8 @@ import {
   X,
   Send,
   CheckCircle2,
+  Globe,
+  Instagram,
 } from 'lucide-react';
 import { Language } from '../types';
 import { DEFAULT_PLATFORM_SETTINGS, PlatformSettings } from '../config/platformConfig';
@@ -105,7 +107,7 @@ export const CustomerSupportModal: React.FC<CustomerSupportModalProps> = ({
 
         {/* Body */}
         <div className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
-          {/* Quick Contact Buttons */}
+          {/* Quick Contact Buttons & Social Links */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* WhatsApp Direct */}
             <a
@@ -127,7 +129,7 @@ export const CustomerSupportModal: React.FC<CustomerSupportModalProps> = ({
               </div>
             </a>
 
-            {/* Direct Phone Call (no spaces in tel: link) */}
+            {/* Direct Phone Call */}
             <a
               href={`tel:${phoneNoSpaces}`}
               className="p-4 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100/90 text-amber-950 flex items-center gap-3 shadow-sm transition-all group"
@@ -141,6 +143,46 @@ export const CustomerSupportModal: React.FC<CustomerSupportModalProps> = ({
                 </strong>
                 <span className="text-[11px] text-amber-800 font-metric block" dir="ltr">
                   {phoneNoSpaces}
+                </span>
+              </div>
+            </a>
+
+            {/* Official Website */}
+            <a
+              href="https://flaster.ae"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-4 rounded-xl border border-blue-300 bg-blue-50 hover:bg-blue-100/90 text-blue-950 flex items-center gap-3 shadow-sm transition-all group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow">
+                <Globe className="w-5 h-5" />
+              </div>
+              <div className="text-start">
+                <strong className="block text-xs font-bold text-blue-950 group-hover:underline">
+                  {isArabic ? 'الموقع الرسمي للشركة' : 'Official Website'}
+                </strong>
+                <span className="text-[11px] text-blue-800 font-metric block" dir="ltr">
+                  flaster.ae
+                </span>
+              </div>
+            </a>
+
+            {/* Instagram / Social Media */}
+            <a
+              href="https://instagram.com/flaster.ae"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-4 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100/90 text-rose-950 flex items-center gap-3 shadow-sm transition-all group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white flex items-center justify-center shrink-0 shadow">
+                <Instagram className="w-5 h-5" />
+              </div>
+              <div className="text-start">
+                <strong className="block text-xs font-bold text-rose-950 group-hover:underline">
+                  {isArabic ? 'صفحة إنستغرام السوشيال' : 'Instagram Social'}
+                </strong>
+                <span className="text-[11px] text-rose-800 font-metric block" dir="ltr">
+                  @flaster.ae
                 </span>
               </div>
             </a>

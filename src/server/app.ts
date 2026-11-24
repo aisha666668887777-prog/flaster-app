@@ -12,6 +12,13 @@ import regionRoutes from './regionRoutes.ts';
 import categoryRoutes from './categoryRoutes.ts';
 import whatsappBotRoutes from './whatsappBotRoutes.ts';
 import { getPilotReadinessReport, PILOT_STORES_RAK } from './pilotConfig.ts';
+import {
+  globalApiRateLimiter,
+  authSensitiveRateLimiter,
+  transactionRateLimiter,
+} from './rateLimiter.ts';
+import { getHealthSnapshot, recordOpsLog, trackApiRequest } from './opsService.ts';
+import { sendAdminAlertEmail } from './emailService.ts';
 
 export interface RequestWithRawBody extends express.Request {
   rawBody?: string;
@@ -34,6 +41,7 @@ function isOriginAllowed(origin: string | undefined): boolean {
     const host = parsed.hostname.toLowerCase();
     if (
       host.endsWith('.flaster.ae') ||
+      host.endsWith('.onrender.com') ||
       host.endsWith('.run.app') ||
       host.endsWith('.ai.studio') ||
       host.endsWith('.aistudio.google.com') ||
@@ -51,6 +59,8 @@ function isOriginAllowed(origin: string | undefined): boolean {
 
 export function createServer() {
   const app = express();
+  // Trust the first reverse proxy hop (Render / Cloud Run) for accurate rate-limit client IP
+  app.set('trust proxy', 1);
 
   // Capture raw request payload bytes for cryptographic HMAC webhook signature verification
   app.use(
@@ -83,6 +93,51 @@ export function createServer() {
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
   });
+
+  // Public lightweight health check for Render & UptimeRobot monitoring
+  app.get('/api/health', (_req, res) => {
+    res.status(200).json(getHealthSnapshot());
+  });
+
+  // Lightweight API request telemetry & error/security observer (no PII or secrets logged)
+  app.use('/api', (req, res, next) => {
+    trackApiRequest();
+    res.on('finish', () => {
+      if (res.statusCode >= 500) {
+        recordOpsLog({
+          level: 'error',
+          category: 'system',
+          message: `Server error ${res.statusCode}`,
+          method: req.method,
+          path: req.originalUrl,
+          statusCode: res.statusCode,
+        });
+        void sendAdminAlertEmail(
+          `5xx:${req.path}`,
+          `خطأ سيرفر (${res.statusCode}) في ${req.path}`,
+          `حدث خطأ برقم ${res.statusCode} أثناء معالجة طلب ${req.method} على المسار ${req.path}.`
+        );
+      } else if (res.statusCode === 401 || res.statusCode === 403) {
+        recordOpsLog({
+          level: 'warn',
+          category: 'auth',
+          message: `Access rejected (${res.statusCode})`,
+          method: req.method,
+          path: req.originalUrl,
+          statusCode: res.statusCode,
+        });
+      }
+    });
+    next();
+  });
+
+  // Tiered API Rate Limiting (08: سقف للطلبات)
+  app.use('/api', globalApiRateLimiter);
+  app.use('/api/auth/merchant-login', authSensitiveRateLimiter);
+  app.use('/api/auth/verify-portal-pin', authSensitiveRateLimiter);
+  app.use('/api/auth/whatsapp-otp', authSensitiveRateLimiter);
+  app.use('/api/orders/create', transactionRateLimiter);
+  app.use('/api/payments/create-intent', transactionRateLimiter);
 
   // Mount WhatsApp Webhook & Auto-Reply Bot routes
   app.use('/api/webhook', whatsappBotRoutes);

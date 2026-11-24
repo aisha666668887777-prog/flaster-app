@@ -172,8 +172,8 @@ export const SocialMediaKitModal: React.FC<SocialMediaKitModalProps> = ({
                     </h4>
                     <p className="text-xs text-slate-500 mt-1">
                       {isArabic
-                        ? 'شعار Flaster النظيف بدون علامات الجوال مع بوكسات إنقاذ الطعام وهوية التطبيق.'
-                        : 'Clean Flaster emblem with food-rescue boxes and tagline.'}
+                        ? 'شعار Flaster النظيف بدون علامات الجوال مع أصناف الطعام وهوية التطبيق.'
+                        : 'Clean Flaster emblem with fresh food items and tagline.'}
                     </p>
                   </div>
                 </div>

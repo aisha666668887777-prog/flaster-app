@@ -19,7 +19,6 @@ import {
   Bell, 
   Volume2, 
   VolumeX, 
-  Truck, 
   MessageSquare, 
   ChefHat, 
   Building2,
@@ -28,74 +27,35 @@ import {
   FileSpreadsheet,
   Banknote,
   Upload,
-  Image as ImageIcon,
   Camera,
-  Trash2
+  Trash2,
+  Utensils,
+  Wallet,
+  ArrowDownLeft,
+  ArrowUpRight
 } from 'lucide-react';
-import { MerchantListing, Category, Language, Order, OrderWorkflowStatus, DynamicRegion, DynamicCategory, MerchantAccountPublicInfo } from '../types';
+import {
+  MerchantListing,
+  Category,
+  Language,
+  Order,
+  OrderWorkflowStatus,
+  DynamicRegion,
+  DynamicCategory,
+  MerchantAccountPublicInfo,
+  MerchantPartner,
+} from '../types';
 import { translations } from '../translations';
 import { verifyPickupOnBackend } from '../firebase/orders';
 import { isSurplusItemExpired } from '../firebase/db';
-import { aedToFils, filsToAed, calculateIncludedVatFils } from '../config/platformConfig';
-
-const CULINARY_PRESETS = [
-  {
-    id: 'pastry',
-    labelAr: 'مخبوزات وكرواسون',
-    labelEn: 'Bakery & Pastries',
-    url: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80',
-    emoji: '🥐',
-  },
-  {
-    id: 'biryani',
-    labelAr: 'برياني وأرز ملكي',
-    labelEn: 'Biryani & Rice Feasts',
-    url: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80',
-    emoji: '🍚',
-  },
-  {
-    id: 'pizza',
-    labelAr: 'بيتزا ومعجنات',
-    labelEn: 'Pizza & Italian',
-    url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80',
-    emoji: '🍕',
-  },
-  {
-    id: 'dessert',
-    labelAr: 'حلويات وكيك فاخر',
-    labelEn: 'Desserts & Cakes',
-    url: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop&q=80',
-    emoji: '🍰',
-  },
-  {
-    id: 'sandwich',
-    labelAr: 'ساندويتشات ومقبلات',
-    labelEn: 'Gourmet Sandwiches',
-    url: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=800&auto=format&fit=crop&q=80',
-    emoji: '🥪',
-  },
-  {
-    id: 'coffee',
-    labelAr: 'مشروبات وقهوة',
-    labelEn: 'Coffee & Drinks',
-    url: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&auto=format&fit=crop&q=80',
-    emoji: '☕',
-  },
-  {
-    id: 'burger',
-    labelAr: 'برجر ومشاوي',
-    labelEn: 'Burgers & Grills',
-    url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80',
-    emoji: '🍔',
-  },
-  {
-    id: 'buffet',
-    labelAr: 'بوفيه وسلطات طازجة',
-    labelEn: 'Buffet & Salads',
-    url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80',
-    emoji: '🥗',
-  },
-];
+import {
+  CUSTOMER_SERVICE_FEE_AED,
+  CUSTOMER_SERVICE_FEE_FILS,
+  MIN_MERCHANT_ITEM_PRICE_AED,
+  aedToFils,
+  filsToAed,
+  calculateIncludedVatFils,
+} from '../config/platformConfig';
 
 interface MerchantWorkspaceProps {
   listings: MerchantListing[];
@@ -104,6 +64,9 @@ interface MerchantWorkspaceProps {
   regions?: DynamicRegion[];
   categories?: DynamicCategory[];
   authenticatedMerchant?: MerchantAccountPublicInfo | null;
+  merchantPartners?: MerchantPartner[];
+  isMasterFounder?: boolean;
+  onSelectMerchant?: (partner: MerchantPartner) => void;
   onUpdateStock: (id: string, delta: number) => void;
   onToggleStatus: (id: string) => void;
   onAddListing: (newListing: Omit<MerchantListing, 'id' | 'revenueAed'>) => void;
@@ -122,6 +85,9 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
   lang,
   regions = [],
   authenticatedMerchant = null,
+  merchantPartners = [],
+  isMasterFounder = false,
+  onSelectMerchant,
   onUpdateStock,
   onToggleStatus,
   onAddListing,
@@ -136,6 +102,20 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
   const t = translations[lang];
   const isArabic = lang === 'ar';
 
+  // Resolve live partner record from Firestore-synced merchantPartners
+  const activePartnerRecord = merchantPartners.find(
+    (m) =>
+      authenticatedMerchant &&
+      (m.id === authenticatedMerchant.merchantId || m.username === authenticatedMerchant.username)
+  );
+  const effectiveCommissionPercent = activePartnerRecord?.commissionPercent ?? platformCommissionPercent;
+  const activeStoreNameAr = activePartnerRecord?.nameAr || authenticatedMerchant?.nameAr || '';
+  const activeStoreNameEn = activePartnerRecord?.name || authenticatedMerchant?.name || '';
+  const activeStoreNeighborhood =
+    activePartnerRecord?.neighborhoodAr ||
+    activePartnerRecord?.neighborhood ||
+    (isArabic ? 'رأس الخيمة' : 'Ras Al Khaimah');
+
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [editingListingId, setEditingListingId] = useState<string | null>(null);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
@@ -143,19 +123,16 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
   const [verifiedSuccess, setVerifiedSuccess] = useState<string | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [workspaceTab, setWorkspaceTab] = useState<'inventory' | 'live_orders' | 'logistics_guide' | 'settlements'>('inventory');
+  const [workspaceTab, setWorkspaceTab] = useState<'inventory' | 'live_orders' | 'settlements'>('inventory');
   const [kitchenChimeEnabled, setKitchenChimeEnabled] = useState(true);
   const [chimeTestFeedback, setChimeTestFeedback] = useState<string | null>(null);
   const [showExpiredListings, setShowExpiredListings] = useState(false);
+  const [priceValidationError, setPriceValidationError] = useState<string | null>(null);
+  const [imageValidationError, setImageValidationError] = useState<string | null>(null);
   const [bankName, setBankName] = useState('بنك أبوظبي الأول (FAB) / Wio Bank');
-  const [wioIban, setWioIban] = useState('AE070860000001234567890');
+  const [wioIban, setWioIban] = useState(activePartnerRecord?.iban || '');
   const [isIbanEditing, setIsIbanEditing] = useState(false);
   const [statementSuccessMsg, setStatementSuccessMsg] = useState<string | null>(null);
-
-  // Courier Dispatch Management State
-  const [courierName, setCourierName] = useState('مندوب التوصيل السريع - رأس الخيمة');
-  const [courierPhone, setCourierPhone] = useState('+971 50 123 4567');
-  const [courierToast, setCourierToast] = useState<string | null>(null);
 
   // Loud, Insistent, Annoying Phone Ring & Kitchen Buzzer (High volume, aggressive multi-pulse alert)
   const playKitchenBell = () => {
@@ -302,20 +279,33 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
   }, [showBroadcastModal, showVerifyModal]);
 
   const [formData, setFormData] = useState({
-    restaurantName: 'مخبز وبوفيه النخيل الفاخر',
-    neighborhood: 'Al Hamra Village',
+    restaurantName: activeStoreNameAr || activeStoreNameEn || '',
+    neighborhood: activePartnerRecord?.neighborhood || 'Al Hamra Village',
     title: '',
     titleAr: '',
-    category: 'bakery' as Category,
+    category: (activePartnerRecord?.category || 'restaurants_cafeterias') as Category,
     imageUrl: '',
-    stock: 4,
-    originalPrice: 85,
-    discountedPrice: 28,
-    pickupWindow: '21:00 - 22:30',
+    stock: 5,
+    originalPrice: 45,
+    discountedPrice: 20,
+    pickupWindow: '20:00 - 22:30',
     expiryHours: 4,
-    allergens: 'Gluten, Dairy, Eggs',
-    ingredients: 'Wheat Flour, Butter, Fresh Milk, Eggs',
+    allergens: '',
+    ingredients: '',
   });
+
+  // Sync form restaurant defaults whenever the selected/authenticated store updates
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      restaurantName: activeStoreNameAr || activeStoreNameEn || prev.restaurantName,
+      neighborhood: activePartnerRecord?.neighborhood || prev.neighborhood,
+      category: (activePartnerRecord?.category || prev.category) as Category,
+    }));
+    if (activePartnerRecord?.iban) {
+      setWioIban(activePartnerRecord.iban);
+    }
+  }, [activeStoreNameAr, activeStoreNameEn, activePartnerRecord?.neighborhood, activePartnerRecord?.category, activePartnerRecord?.iban]);
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -344,10 +334,12 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+          const compressed = canvas.toDataURL('image/jpeg', 0.78);
           setFormData((prev) => ({ ...prev, imageUrl: compressed }));
+          setImageValidationError(null);
         } else {
           setFormData((prev) => ({ ...prev, imageUrl: rawData }));
+          setImageValidationError(null);
         }
       };
       img.src = rawData;
@@ -370,27 +362,53 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
 
   const handleOpenEditModal = (item: MerchantListing) => {
     setEditingListingId(item.id);
+    setPriceValidationError(null);
+    setImageValidationError(null);
     setFormData({
-      restaurantName: item.merchantNameAr || item.merchantName || authenticatedMerchant?.nameAr || 'مخبز وبوفيه النخيل الفاخر',
-      neighborhood: item.neighborhood || 'Al Hamra Village',
+      restaurantName: item.merchantNameAr || item.merchantName || activeStoreNameAr || '',
+      neighborhood: item.neighborhood || activePartnerRecord?.neighborhood || 'Al Hamra Village',
       title: item.title,
       titleAr: item.titleAr || item.title,
       category: item.category,
       imageUrl: item.imageUrl || '',
       stock: item.stock,
-      originalPrice: item.originalPrice,
-      discountedPrice: item.discountedPrice,
+      originalPrice: Math.max(MIN_MERCHANT_ITEM_PRICE_AED, item.originalPrice),
+      discountedPrice: Math.max(MIN_MERCHANT_ITEM_PRICE_AED, item.discountedPrice),
       pickupWindow: item.pickupWindow,
       expiryHours: 4,
-      allergens: item.allergens ? item.allergens.join(', ') : 'Gluten, Dairy, Eggs',
-      ingredients: item.ingredients || 'Wheat Flour, Butter, Fresh Milk, Eggs',
+      allergens: item.allergens ? item.allergens.join(', ') : '',
+      ingredients: item.ingredients || '',
     });
     setShowBroadcastModal(true);
   };
 
   const handleSubmitBroadcast = (e: React.FormEvent) => {
     e.preventDefault();
+    setPriceValidationError(null);
+    setImageValidationError(null);
     if (!formData.title && !formData.titleAr) return;
+
+    // Strictly require real uploaded product photo (no photo bank allowed)
+    if (!formData.imageUrl || !formData.imageUrl.trim()) {
+      setImageValidationError(
+        isArabic
+          ? 'يجب رفع صورة حقيقية لصنف الطعام من جهازك أو الكاميرا قبل النشر.'
+          : 'You must upload a real photo of your food item before publishing.'
+      );
+      return;
+    }
+
+    if (!Number.isFinite(formData.discountedPrice) || formData.discountedPrice < MIN_MERCHANT_ITEM_PRICE_AED) {
+      setPriceValidationError(
+        isArabic
+          ? `الحد الأدنى لسعر البيع الذي يمكن للتاجر إدخاله هو ${MIN_MERCHANT_ITEM_PRICE_AED} درهماً إماراتياً.`
+          : `Minimum selling price is ${MIN_MERCHANT_ITEM_PRICE_AED} AED.`
+      );
+      return;
+    }
+
+    const safeDiscountedPrice = Number(formData.discountedPrice);
+    const safeOriginalPrice = Math.max(safeDiscountedPrice, Number(formData.originalPrice) || safeDiscountedPrice);
 
     const expiryIso = new Date(Date.now() + Math.max(1, formData.expiryHours) * 3600 * 1000).toISOString();
     const parsedAllergens = formData.allergens
@@ -406,10 +424,10 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
         merchantNameAr: formData.restaurantName,
         neighborhood: formData.neighborhood,
         category: formData.category,
-        imageUrl: formData.imageUrl || undefined,
+        imageUrl: formData.imageUrl,
         stock: formData.stock,
-        originalPrice: formData.originalPrice,
-        discountedPrice: formData.discountedPrice,
+        originalPrice: safeOriginalPrice,
+        discountedPrice: safeDiscountedPrice,
         pickupWindow: formData.pickupWindow,
         expiryTime: expiryIso,
         allergens: parsedAllergens,
@@ -424,11 +442,11 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
         merchantNameAr: formData.restaurantName,
         neighborhood: formData.neighborhood,
         category: formData.category,
-        imageUrl: formData.imageUrl || undefined,
+        imageUrl: formData.imageUrl,
         stock: formData.stock,
         initialStock: formData.stock,
-        originalPrice: formData.originalPrice,
-        discountedPrice: formData.discountedPrice,
+        originalPrice: safeOriginalPrice,
+        discountedPrice: safeDiscountedPrice,
         pickupWindow: formData.pickupWindow,
         expiryTime: expiryIso,
         allergens: parsedAllergens,
@@ -439,214 +457,391 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
     }
 
     setEditingListingId(null);
+    setPriceValidationError(null);
+    setImageValidationError(null);
     setFormData({
-      restaurantName: authenticatedMerchant?.nameAr || 'مخبز وبوفيه النخيل الفاخر',
-      neighborhood: 'Al Hamra Village',
+      restaurantName: activeStoreNameAr || activeStoreNameEn || '',
+      neighborhood: activePartnerRecord?.neighborhood || 'Al Hamra Village',
       title: '',
       titleAr: '',
-      category: 'bakery',
+      category: (activePartnerRecord?.category || 'restaurants_cafeterias') as Category,
       imageUrl: '',
-      stock: 4,
-      originalPrice: 85,
-      discountedPrice: 28,
-      pickupWindow: '21:00 - 22:30',
+      stock: 5,
+      originalPrice: 45,
+      discountedPrice: 20,
+      pickupWindow: '20:00 - 22:30',
       expiryHours: 4,
-      allergens: 'Gluten, Dairy, Eggs',
-      ingredients: 'Wheat Flour, Butter, Fresh Milk, Eggs',
+      allergens: '',
+      ingredients: '',
     });
     setShowBroadcastModal(false);
   };
 
-  // Financial Calculations for Wio Business Corporate Settlements (in integer fils)
-  const totalGrossSalesFils = orders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? aedToFils(o.totalAed) : 0), 0);
-  const totalGrossSales = filsToAed(totalGrossSalesFils);
-  const electronicOrders = orders.filter(o => o.status !== 'cancelled' && o.paymentMethod !== 'pickup_cash');
-  const cashOrders = orders.filter(o => o.status !== 'cancelled' && o.paymentMethod === 'pickup_cash');
-  const electronicSalesFils = electronicOrders.reduce((sum, o) => sum + aedToFils(o.totalAed), 0);
-  const electronicSales = filsToAed(electronicSalesFils);
-  const cashSalesFils = cashOrders.reduce((sum, o) => sum + aedToFils(o.totalAed), 0);
-  const cashSales = filsToAed(cashSalesFils);
-  const commissionRateFraction = platformCommissionPercent / 100;
-  const platformCommissionTotalFils = Math.round(totalGrossSalesFils * commissionRateFraction);
-  const platformCommissionTotal = filsToAed(platformCommissionTotalFils);
-  const netBankPayoutFils = Math.max(0, electronicSalesFils - platformCommissionTotalFils);
-  const netBankPayout = filsToAed(netBankPayoutFils);
+  // Exact Integer-Fils Accounting Helper for Every Order (Cash vs Electronic Settlement)
+  const computeOrderLedger = (o: Order) => {
+    const qty = Math.max(1, o.quantity || 1);
+    const merchantSubtotalFils =
+      typeof o.subtotalFils === 'number'
+        ? Math.round(o.subtotalFils)
+        : aedToFils(o.item.discountedPrice) * qty;
+    const platformServiceFeeFils =
+      typeof o.serviceFeeFils === 'number'
+        ? Math.round(o.serviceFeeFils)
+        : CUSTOMER_SERVICE_FEE_FILS * qty;
+    const pointsDiscountFils =
+      typeof o.pointsDiscountFils === 'number'
+        ? Math.round(o.pointsDiscountFils)
+        : aedToFils(o.pointsDiscountAed || 0);
+    const customerPaidFils =
+      typeof o.totalFils === 'number'
+        ? Math.round(o.totalFils)
+        : Math.max(0, merchantSubtotalFils + platformServiceFeeFils - pointsDiscountFils);
+    const commissionFils = Math.round((merchantSubtotalFils * effectiveCommissionPercent) / 100);
+    const merchantNetEarningsFils = Math.max(0, merchantSubtotalFils - commissionFils);
+    const isCash = o.paymentMethod === 'pickup_cash';
+
+    // Cash order: Merchant collects customerPaidFils at counter, keeps merchantNetEarningsFils, owes platform the difference
+    // Online order: Platform collects customerPaidFils online, owes merchant merchantNetEarningsFils
+    const merchantOwesPlatformFils = isCash
+      ? Math.max(0, customerPaidFils - merchantNetEarningsFils)
+      : 0;
+    const platformOwesMerchantFils = isCash
+      ? Math.max(0, merchantNetEarningsFils - customerPaidFils)
+      : merchantNetEarningsFils;
+
+    return {
+      isCash,
+      merchantSubtotalFils,
+      platformServiceFeeFils,
+      customerPaidFils,
+      commissionFils,
+      merchantNetEarningsFils,
+      merchantOwesPlatformFils,
+      platformOwesMerchantFils,
+    };
+  };
+
+  const validOrders = orders.filter((o) => o.status !== 'cancelled');
+  const electronicOrders = validOrders.filter((o) => o.paymentMethod !== 'pickup_cash');
+  const cashOrders = validOrders.filter((o) => o.paymentMethod === 'pickup_cash');
+
+  const ledgerTotals = validOrders.reduce(
+    (acc, o) => {
+      const l = computeOrderLedger(o);
+      acc.merchantSubtotalFils += l.merchantSubtotalFils;
+      acc.customerPaidFils += l.customerPaidFils;
+      acc.commissionFils += l.commissionFils;
+      acc.merchantNetEarningsFils += l.merchantNetEarningsFils;
+      acc.merchantOwesPlatformFils += l.merchantOwesPlatformFils;
+      acc.platformOwesMerchantFils += l.platformOwesMerchantFils;
+      if (l.isCash) {
+        acc.cashCollectedFils += l.customerPaidFils;
+      } else {
+        acc.onlineCollectedFils += l.customerPaidFils;
+      }
+      return acc;
+    },
+    {
+      merchantSubtotalFils: 0,
+      customerPaidFils: 0,
+      commissionFils: 0,
+      merchantNetEarningsFils: 0,
+      merchantOwesPlatformFils: 0,
+      platformOwesMerchantFils: 0,
+      cashCollectedFils: 0,
+      onlineCollectedFils: 0,
+    }
+  );
+
+  const totalGrossSales = filsToAed(ledgerTotals.merchantSubtotalFils);
+  const electronicSales = filsToAed(ledgerTotals.onlineCollectedFils);
+  const cashSales = filsToAed(ledgerTotals.cashCollectedFils);
+  const platformCommissionTotal = filsToAed(ledgerTotals.commissionFils);
+  const merchantNetEarningsTotal = filsToAed(ledgerTotals.merchantNetEarningsFils);
+  const merchantOwesPlatformTotal = filsToAed(ledgerTotals.merchantOwesPlatformFils);
+  const platformOwesMerchantTotal = filsToAed(ledgerTotals.platformOwesMerchantFils);
+  // Positive = Platform owes Merchant; Negative = Merchant owes Platform
+  const netBalanceFils = ledgerTotals.platformOwesMerchantFils - ledgerTotals.merchantOwesPlatformFils;
+  const netBalanceAed = filsToAed(Math.abs(netBalanceFils));
 
   const handleExportSettlementCSV = () => {
     const headers = [
       'Order Code',
       'Date',
-      'Item',
-      'Fulfillment',
+      'Food Item',
       'Payment Method',
-      'Gross Total (Fils)',
-      'Gross Total (AED)',
-      'Included 5% VAT (AED)',
-      `Commission (${platformCommissionPercent}%) AED`,
-      'Net Merchant AED'
+      'Customer Paid (AED)',
+      'Merchant Base Price (AED)',
+      `Commission (${effectiveCommissionPercent}%) AED`,
+      'Merchant Net Earnings (AED)',
+      'Merchant Owes Platform - Cash (AED)',
+      'Platform Owes Merchant - Online (AED)',
     ];
-    const rows = orders.map(o => {
-      const totalFils = aedToFils(o.totalAed);
-      const vatFils = calculateIncludedVatFils(totalFils);
-      const commFils = Math.round(totalFils * commissionRateFraction);
-      const netFils = totalFils - commFils;
+    const rows = validOrders.map((o) => {
+      const l = computeOrderLedger(o);
       return [
-        o.code,
-        new Date(o.createdAt).toLocaleDateString(),
+        `"${o.code}"`,
+        `"${new Date(o.createdAt).toLocaleDateString()}"`,
         `"${(isArabic ? o.item.title.ar : o.item.title.en).replace(/"/g, '""')}"`,
-        o.fulfillmentType,
-        o.paymentMethod || 'electronic',
-        totalFils,
-        filsToAed(totalFils).toFixed(2),
-        filsToAed(vatFils).toFixed(2),
-        filsToAed(commFils).toFixed(2),
-        filsToAed(netFils).toFixed(2)
+        `"${l.isCash ? 'Cash on Pickup' : 'Online Payment'}"`,
+        filsToAed(l.customerPaidFils).toFixed(2),
+        filsToAed(l.merchantSubtotalFils).toFixed(2),
+        filsToAed(l.commissionFils).toFixed(2),
+        filsToAed(l.merchantNetEarningsFils).toFixed(2),
+        filsToAed(l.merchantOwesPlatformFils).toFixed(2),
+        filsToAed(l.platformOwesMerchantFils).toFixed(2),
       ].join(',');
     });
-    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const csvString = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Flaster_Settlement_Statement_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.href = url;
+    link.setAttribute('download', `Flaster_Store_Settlement_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    setStatementSuccessMsg(isArabic ? '✓ تم تصدير كشف الحساب والتحويلات البنكية بنجاح!' : '✓ Settlement statement exported successfully!');
+    URL.revokeObjectURL(url);
+    setStatementSuccessMsg(isArabic ? '✓ تم تصدير كشف الحساب والتسوية المالية بنجاح!' : '✓ Settlement statement exported successfully!');
     setTimeout(() => setStatementSuccessMsg(null), 4000);
   };
 
   return (
     <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-in fade-in duration-200">
       
-      {/* Top Banner / Merchant Identity */}
-      <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-elevation-1 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      {/* Live Synced Partner Store Selector Bar (Visible to Founder/Admin whenever stores exist in Admin) */}
+      {isMasterFounder && (
+        <div className="bg-[#FFFDF9] rounded-xl border border-[#EAE4DC] p-4 shadow-xs space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Store className="w-4 h-4 text-[#DC2626]" />
+              <span className="font-headline font-bold text-xs text-[#1C1917]">
+                {isArabic
+                  ? `المتاجر المسجّلة في الإدارة العامة (${merchantPartners.length}) — متزامنة لحظياً:`
+                  : `Live Synced Partner Stores from Admin (${merchantPartners.length}):`}
+              </span>
+            </div>
+            <span className="text-[11px] text-[#78716C]">
+              {isArabic
+                ? 'أي متجر تضيفه في الإدارة العامة يظهر هنا فوراً كمتجر إلكتروني مصغر'
+                : 'Any store added in Admin appears here instantly as a mini-store'}
+            </span>
+          </div>
+
+          {merchantPartners.length === 0 ? (
+            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-950 font-semibold">
+              {isArabic
+                ? 'لا توجد متاجر مضافة بعد. أضف أول متجر من لوحة الإدارة العامة وسيظهر هنا تلقائياً فوراً.'
+                : 'No stores added yet. Add your first store in Admin Dashboard and it will appear here instantly.'}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              {merchantPartners.map((partner) => {
+                const isSelected = authenticatedMerchant?.merchantId === partner.id;
+                return (
+                  <button
+                    key={partner.id}
+                    type="button"
+                    onClick={() => onSelectMerchant && onSelectMerchant(partner)}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                      isSelected
+                        ? 'bg-[#DC2626] text-white border-[#DC2626] shadow-sm'
+                        : 'bg-[#FAF7F2] text-[#1C1917] border-[#EAE4DC] hover:border-amber-400'
+                    }`}
+                  >
+                    <Store className="w-3.5 h-3.5" />
+                    <span>{isArabic ? partner.nameAr : partner.name}</span>
+                    <span className={`text-[10px] font-metric ${isSelected ? 'text-amber-200' : 'text-[#78716C]'}`}>
+                      ({partner.commissionPercent}%)
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Top Banner / Mini E-Commerce Storefront Identity */}
+      <div className="bg-[#FFFDF9] rounded-2xl border border-[#EAE4DC] p-6 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#DC2626] to-[#991B1B] text-white flex items-center justify-center shadow-md">
+          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#DC2626] to-[#991B1B] text-white flex items-center justify-center shadow-md shrink-0">
             <Store className="w-7 h-7" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
-                {lang === 'ar' ? 'متصل وموثّق' : 'Live Verified'}
+            <div className="flex flex-wrap items-center gap-2 text-xs text-[#78716C]">
+              <span className="font-bold text-[#059669]">
+                {isArabic ? 'متجر إلكتروني مصغر نشط' : 'Live Mini-Storefront'}
               </span>
-              {authenticatedMerchant && (
-                <span className="px-2 py-0.5 rounded text-[10px] font-metric font-bold bg-amber-100 text-amber-900 border border-amber-300" dir="ltr">
-                  @{authenticatedMerchant.username}
-                </span>
+              {authenticatedMerchant?.username && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span className="font-metric font-bold text-[#1C1917]" dir="ltr">
+                    @{authenticatedMerchant.username}
+                  </span>
+                </>
               )}
-              <span className="text-xs text-[#64748B]">
-                {lang === 'ar' ? 'فرع رأس الخيمة' : 'Ras Al Khaimah'}
+              <span aria-hidden="true">·</span>
+              <span>{activeStoreNeighborhood}</span>
+              <span aria-hidden="true">·</span>
+              <span className="font-metric font-semibold text-[#DC2626]">
+                {isArabic ? `عمولة المنصة ${effectiveCommissionPercent}%` : `Commission ${effectiveCommissionPercent}%`}
               </span>
             </div>
-            <h1 className="font-headline font-extrabold text-2xl text-[#0F172A] mt-1">
-              {authenticatedMerchant
-                ? lang === 'ar'
-                  ? authenticatedMerchant.nameAr
-                  : authenticatedMerchant.name
-                : t.merchantHeadline}
+            <h1 className="font-headline font-extrabold text-2xl text-[#1C1917] mt-1">
+              {activeStoreNameAr || activeStoreNameEn
+                ? isArabic
+                  ? activeStoreNameAr || activeStoreNameEn
+                  : activeStoreNameEn || activeStoreNameAr
+                : isArabic
+                  ? 'بوابة الشركاء — متجرك الإلكتروني المصغر'
+                  : 'Partner Portal — Your Mini Store'}
             </h1>
-            <p className="text-xs text-[#64748B]">
-              {t.merchantSubheadline}
+            <p className="text-xs text-[#78716C]">
+              {isArabic
+                ? 'أضف أصناف طعامك بصورها الحقيقية، حدد الأسعار، استقبل حجوزات الزبائن، وتابع أرباحك وحساب النقدي والإلكتروني لحظياً'
+                : 'List food items with real photos, set prices, receive customer bookings, and track cash vs online settlements live'}
             </p>
           </div>
         </div>
 
         {/* Quick Action Buttons */}
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
           <button
-            onClick={() => setShowVerifyModal(true)}
-            className="flex-1 md:flex-initial h-12 px-5 rounded-lg bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
-          >
-            <QrCode className="w-4 h-4 text-emerald-200" />
-            <span>{isArabic ? 'التحقق من تذكرة زبون (مسح كود)' : 'Scan / Verify Customer Code'}</span>
-          </button>
-
-          <button
-            onClick={() => setShowBroadcastModal(true)}
-            className="flex-1 md:flex-initial h-12 px-5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 hover:from-amber-600 hover:via-orange-600 hover:to-rose-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 active:scale-95 transition-all cursor-pointer"
+            type="button"
+            onClick={() => {
+              setEditingListingId(null);
+              setPriceValidationError(null);
+              setImageValidationError(null);
+              setFormData((prev) => ({
+                ...prev,
+                restaurantName: activeStoreNameAr || activeStoreNameEn || prev.restaurantName,
+                title: '',
+                titleAr: '',
+                imageUrl: '',
+              }));
+              setShowBroadcastModal(true);
+            }}
+            className="flex-1 md:flex-initial h-11 px-5 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
-            <span>{isArabic ? 'بث وجبة فائض جديدة 🍽️' : t.broadcastSurplus}</span>
+            <span>{isArabic ? 'إضافة صنف طعام جديد' : 'Add New Food Item'}</span>
           </button>
 
           <button
-            onClick={onSwitchToMarketplace}
-            className="flex-1 md:flex-initial h-12 px-4 rounded-lg bg-white border border-[#CBD5E1] hover:bg-slate-50 text-[#0F172A] font-semibold text-xs flex items-center justify-center gap-2 transition-colors"
+            type="button"
+            onClick={() => setShowVerifyModal(true)}
+            className="flex-1 md:flex-initial h-11 px-4 rounded-xl bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap"
           >
-            <RotateCcw className="w-4 h-4 text-[#64748B]" />
+            <QrCode className="w-4 h-4" />
+            <span>{isArabic ? 'تسليم حجز (كود الاستلام)' : 'Verify Pickup Code'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onSwitchToMarketplace}
+            className="flex-1 md:flex-initial h-11 px-4 rounded-xl bg-white border border-[#EAE4DC] hover:bg-[#FAF7F2] text-[#1C1917] font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <RotateCcw className="w-4 h-4 text-[#78716C]" />
             <span>{t.consumerMarketplace}</span>
           </button>
 
           <button
+            type="button"
             onClick={onLogout}
-            className="flex-1 md:flex-initial h-12 px-4 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
-            title={lang === 'ar' ? 'قفل البوابة وتسجيل الخروج' : 'Lock & Logout'}
+            className="flex-1 md:flex-initial h-11 px-4 rounded-xl bg-[#FAF7F2] hover:bg-stone-200 border border-[#EAE4DC] text-stone-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+            title={lang === 'ar' ? 'تسجيل الخروج' : 'Logout'}
           >
             <Lock className="w-3.5 h-3.5 text-[#DC2626]" />
-            <span>{lang === 'ar' ? 'قفل البوابة 🔒' : 'Lock Portal 🔒'}</span>
+            <span>{isArabic ? 'خروج' : 'Logout'}</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Metric Cards */}
+      {/* Real-Time Mini-Store Earnings & Cash/Electronic Settlement KPI Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-metric">
-        
-        {/* Metric 1 */}
-        <div className="bg-white rounded-lg p-5 border border-[#E2E8F0] shadow-elevation-1 space-y-1">
-          <div className="flex items-center justify-between text-xs text-[#64748B]">
-            <span>{t.colRevenue}</span>
+        {/* Card 1: Total Store Net Earnings */}
+        <div className="bg-[#FFFDF9] rounded-xl p-5 border border-[#EAE4DC] shadow-xs space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-[#78716C] font-sans">
+            <span>{isArabic ? 'صافي أرباح متجرك' : 'Your Net Earnings'}</span>
             <DollarSign className="w-4 h-4 text-[#059669]" />
           </div>
-          <div className="text-2xl font-bold text-[#0F172A]">
-            {totalSalvagedRevenue} <span className="text-sm font-semibold text-[#059669]">{t.currency}</span>
+          <div className="text-2xl font-extrabold text-[#1C1917] tabular-nums">
+            {merchantNetEarningsTotal.toFixed(2)}{' '}
+            <span className="text-xs font-semibold text-[#059669]">{t.currency}</span>
           </div>
-          <p className="text-[11px] text-emerald-600 font-semibold">
-            ↑ +24% {lang === 'ar' ? 'مقارنة بالأسبوع الماضي' : 'vs last week'}
+          <p className="text-[11px] text-[#78716C] font-sans">
+            {isArabic
+              ? `من ${validOrders.length} حجز (بعد خصم عمولة ${effectiveCommissionPercent}%)`
+              : `From ${validOrders.length} bookings (after ${effectiveCommissionPercent}% fee)`}
           </p>
         </div>
 
-        {/* Metric 2 */}
-        <div className="bg-white rounded-lg p-5 border border-[#E2E8F0] shadow-elevation-1 space-y-1">
-          <div className="flex items-center justify-between text-xs text-[#64748B]">
-            <span>{lang === 'ar' ? 'نسبة تصريف الفائض' : 'Salvage Rate'}</span>
-            <TrendingUp className="w-4 h-4 text-[#F59E0B]" />
+        {/* Card 2: Cash Orders — What Merchant Owes Platform */}
+        <div className="bg-amber-50/70 rounded-xl p-5 border border-amber-300 shadow-xs space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-amber-950 font-sans font-bold">
+            <span>{isArabic ? 'عليك تدفعه لنا (الدفع النقدي)' : 'You Owe Us (Cash Orders)'}</span>
+            <ArrowUpRight className="w-4 h-4 text-[#DC2626]" />
           </div>
-          <div className="text-2xl font-bold text-[#0F172A]">
-            94.2%
+          <div className="text-2xl font-extrabold text-[#DC2626] tabular-nums">
+            {merchantOwesPlatformTotal.toFixed(2)}{' '}
+            <span className="text-xs font-semibold">{t.currency}</span>
           </div>
-          <p className="text-[11px] text-[#64748B]">
-            {lang === 'ar' ? 'صفر هدر في الأغذية الصالحة' : 'Zero edible waste target'}
+          <p className="text-[11px] text-amber-900 font-sans">
+            {isArabic
+              ? `استلمت ${cashSales.toFixed(2)} د.إ كاش (${cashOrders.length} طلب)`
+              : `Collected ${cashSales.toFixed(2)} AED cash (${cashOrders.length} orders)`}
           </p>
         </div>
 
-        {/* Metric 3 */}
-        <div className="bg-white rounded-lg p-5 border border-[#E2E8F0] shadow-elevation-1 space-y-1">
-          <div className="flex items-center justify-between text-xs text-[#64748B]">
-            <span>{lang === 'ar' ? 'الباقات النشطة المعروضة' : 'Active Offerings'}</span>
-            <Layers className="w-4 h-4 text-[#DC2626]" />
+        {/* Card 3: Electronic Orders — What Platform Owes Merchant */}
+        <div className="bg-emerald-50/70 rounded-xl p-5 border border-emerald-300 shadow-xs space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-emerald-950 font-sans font-bold">
+            <span>{isArabic ? 'علينا ندفعه لك (الدفع الإلكتروني)' : 'We Owe You (Online Orders)'}</span>
+            <ArrowDownLeft className="w-4 h-4 text-[#059669]" />
           </div>
-          <div className="text-2xl font-bold text-[#0F172A]">
-            {activeListingsCount}
+          <div className="text-2xl font-extrabold text-[#059669] tabular-nums">
+            {platformOwesMerchantTotal.toFixed(2)}{' '}
+            <span className="text-xs font-semibold">{t.currency}</span>
           </div>
-          <p className="text-[11px] text-[#64748B]">
-            {totalStockLeft} {lang === 'ar' ? 'وجبة بانتظار الحجز' : 'boxes waiting'}
+          <p className="text-[11px] text-emerald-900 font-sans">
+            {isArabic
+              ? `مبيعات إلكترونية ${electronicSales.toFixed(2)} د.إ (${electronicOrders.length} طلب)`
+              : `Online sales ${electronicSales.toFixed(2)} AED (${electronicOrders.length} orders)`}
           </p>
         </div>
 
-        {/* Metric 4 */}
-        <div className="bg-white rounded-lg p-5 border border-[#E2E8F0] shadow-elevation-1 space-y-1">
-          <div className="flex items-center justify-between text-xs text-[#64748B]">
-            <span>{lang === 'ar' ? 'التزام الاستلام' : 'Pickup Compliance'}</span>
-            <CheckCircle2 className="w-4 h-4 text-sky-600" />
+        {/* Card 4: Net Final Settlement + Active Items */}
+        <div className="bg-[#FFFDF9] rounded-xl p-5 border border-[#EAE4DC] shadow-xs space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-[#78716C] font-sans font-bold">
+            <span>{isArabic ? 'صافي التسوية النهائي' : 'Net Final Balance'}</span>
+            <Wallet className="w-4 h-4 text-[#1C1917]" />
           </div>
-          <div className="text-2xl font-bold text-[#0F172A]">
-            98.5%
+          <div
+            className={`text-2xl font-extrabold tabular-nums ${
+              netBalanceFils > 0
+                ? 'text-[#059669]'
+                : netBalanceFils < 0
+                  ? 'text-[#DC2626]'
+                  : 'text-[#1C1917]'
+            }`}
+          >
+            {netBalanceAed.toFixed(2)} <span className="text-xs font-semibold">{t.currency}</span>
           </div>
-          <p className="text-[11px] text-sky-600 font-semibold">
-            {lang === 'ar' ? 'متوسط وقت التحقق 30 ثانية' : '30s counter scan speed'}
+          <p className="text-[11px] font-sans font-semibold text-[#57534E]">
+            {netBalanceFils > 0
+              ? isArabic
+                ? 'المستحق لك للتحويل من المنصة'
+                : 'Net payout due to your store'
+              : netBalanceFils < 0
+                ? isArabic
+                  ? 'المستحق عليك تحويله للمنصة'
+                  : 'Net balance payable to Flaster'
+                : isArabic
+                  ? `${activeListingsCount} أصناف معروضة • ${totalStockLeft} قطعة متوفرة`
+                  : `${activeListingsCount} active items • ${totalStockLeft} in stock`}
           </p>
         </div>
-
       </div>
 
       {/* Workspace Navigation Tabs */}
@@ -683,18 +878,6 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
                 {activeOrdersCount} {isArabic ? 'جديد' : 'new'}
               </span>
             )}
-          </button>
-
-          <button
-            onClick={() => setWorkspaceTab('logistics_guide')}
-            className={`px-4 py-2.5 rounded-xl font-headline font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
-              workspaceTab === 'logistics_guide'
-                ? 'bg-[#059669] text-white shadow-md'
-                : 'bg-white text-[#64748B] hover:text-[#059669] border border-slate-200'
-            }`}
-          >
-            <Truck className="w-4 h-4" />
-            <span>{isArabic ? 'إدارة التوصيل والمناديب' : 'Delivery & Courier Dispatch'}</span>
           </button>
 
           <button
@@ -765,19 +948,19 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
         </div>
       )}
 
-      {/* TAB 1: Inventory Table */}
+      {/* TAB 1: Mini E-Commerce Storefront Items Catalog */}
       {workspaceTab === 'inventory' && (
-        <div className="bg-[#FFFDF9] rounded-xl border border-[#EAE4DC] shadow-xs overflow-hidden animate-in fade-in">
-          
+        <div className="bg-[#FFFDF9] rounded-2xl border border-[#EAE4DC] shadow-xs overflow-hidden animate-in fade-in">
           <div className="p-5 border-b border-[#EAE4DC] flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="font-headline font-bold text-lg text-[#1C1917]">
-                {t.activeListings}
+              <h3 className="font-headline font-bold text-lg text-[#1C1917] flex items-center gap-2">
+                <Utensils className="w-5 h-5 text-[#DC2626]" />
+                <span>{isArabic ? 'أصناف الطعام في متجرك الإلكتروني' : 'Food Items in Your Mini Store'}</span>
               </h3>
               <p className="text-xs text-[#78716C]">
                 {isArabic
-                  ? 'التحكم بالكميات، أوقات الاستلام، وإخفاء العروض المنتهية تلقائياً'
-                  : 'Manage live quantities, pickup windows, and expiry times'}
+                  ? 'أضف أصناف طعامك بصورها الحقيقية، حدد السعر والكمية وأوقات الاستلام، وتابع حالتها مباشرة'
+                  : 'Add your food items with real photos, set prices, stock, and pickup windows'}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -785,172 +968,193 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowExpiredListings(!showExpiredListings)}
-                  className="px-3 py-1 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 text-xs font-bold cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 text-xs font-bold cursor-pointer"
                 >
                   {showExpiredListings
                     ? (isArabic ? 'إخفاء المنتهية تلقائياً' : 'Auto-hide Expired')
                     : (isArabic ? `إظهار المنتهية (${expiredCount})` : `Show Expired (${expiredCount})`)}
                 </button>
               )}
-              <span className="text-xs text-[#78716C] font-metric">
-                {visibleListings.length} {lang === 'ar' ? 'عروض نشطة' : 'active listings'}
-              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingListingId(null);
+                  setPriceValidationError(null);
+                  setImageValidationError(null);
+                  setFormData((prev) => ({
+                    ...prev,
+                    restaurantName: activeStoreNameAr || activeStoreNameEn || prev.restaurantName,
+                    title: '',
+                    titleAr: '',
+                    imageUrl: '',
+                  }));
+                  setShowBroadcastModal(true);
+                }}
+                className="px-4 py-2 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{isArabic ? 'إضافة صنف جديد' : 'Add Food Item'}</span>
+              </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-start border-collapse">
-              <thead>
-                <tr className="bg-[#FAF7F2] border-b border-[#EAE4DC] text-[11px] font-metric uppercase tracking-wider text-[#78716C]">
-                  <th className="py-3 px-5 text-start font-semibold">{t.colItem}</th>
-                  <th className="py-3 px-4 text-start font-semibold">{t.colCategory}</th>
-                  <th className="py-3 px-4 text-start font-semibold">{t.colStock}</th>
-                  <th className="py-3 px-4 text-start font-semibold">{t.colPrice}</th>
-                  <th className="py-3 px-4 text-start font-semibold">{t.colPickup}</th>
-                  <th className="py-3 px-4 text-start font-semibold">{isArabic ? 'انتهاء الصلاحية / الحساسية' : 'Expiry & Allergens'}</th>
-                  <th className="py-3 px-4 text-start font-semibold">{t.colRevenue}</th>
-                  <th className="py-3 px-5 text-end font-semibold">{t.colActions}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#EAE4DC] text-xs">
-                {visibleListings.map((item) => {
-                  const title = isArabic ? item.titleAr : item.title;
-                  const isSoldOut = item.stock === 0 || item.status === 'sold_out';
-                  const isPaused = item.status === 'paused';
-                  const isExpired = isSurplusItemExpired(item.expiryTime) || item.status === 'expired';
+          {visibleListings.length === 0 ? (
+            <div className="p-12 text-center space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 text-[#DC2626] mx-auto flex items-center justify-center">
+                <Utensils className="w-8 h-8" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-headline font-bold text-base text-[#1C1917]">
+                  {isArabic ? 'متجرك جاهز — أضف أول صنف طعام الآن' : 'Your Mini Store is Ready — Add Your First Food Item'}
+                </h4>
+                <p className="text-xs text-[#78716C] max-w-md mx-auto">
+                  {isArabic
+                    ? 'ارفع صورة حقيقية لصنف الطعام، حدد السعر (بحد أدنى 15 درهم) والكمية ووقت الاستلام ليظهر للزبائن فوراً.'
+                    : 'Upload a real photo of your dish, set the price (minimum 15 AED), stock, and pickup window to go live immediately.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingListingId(null);
+                  setPriceValidationError(null);
+                  setImageValidationError(null);
+                  setShowBroadcastModal(true);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold inline-flex items-center gap-2 shadow-sm cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{isArabic ? 'إضافة أول صنف طعام' : 'Add First Food Item'}</span>
+              </button>
+            </div>
+          ) : (
+            <div className="p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {visibleListings.map((item) => {
+                const title = isArabic ? item.titleAr || item.title : item.title;
+                const isSoldOut = item.stock === 0 || item.status === 'sold_out';
+                const isPaused = item.status === 'paused';
+                const isExpired = isSurplusItemExpired(item.expiryTime) || item.status === 'expired';
+                const merchantPriceFils = aedToFils(item.discountedPrice);
+                const merchantNetPerUnitAed = filsToAed(
+                  merchantPriceFils - Math.round((merchantPriceFils * effectiveCommissionPercent) / 100)
+                );
 
-                  return (
-                    <tr 
-                      key={item.id} 
-                      className="h-14 hover:bg-[#FAF7F2] transition-colors duration-150"
-                    >
-                      {/* Item Title & Status Pill */}
-                      <td className="py-3 px-5">
-                        <div className="flex items-center gap-3">
-                          <span className={`w-2.5 h-2.5 rounded-full ${
-                            isExpired ? 'bg-red-500' : isSoldOut ? 'bg-stone-300' : isPaused ? 'bg-amber-400' : 'bg-[#059669]'
-                          }`} />
-                          <div>
-                            <p className="font-bold text-[#1C1917]">{title}</p>
-                            <p className="text-[11px] text-[#78716C]">
-                              {item.initialStock} {lang === 'ar' ? 'طرحت في البداية' : 'initially broadcasted'}
-                              {item.ingredients ? ` • ${isArabic ? (item.ingredientsAr || item.ingredients) : item.ingredients}` : ''}
-                            </p>
-                          </div>
+                return (
+                  <div
+                    key={item.id}
+                    className="rounded-xl border border-[#EAE4DC] bg-white overflow-hidden flex flex-col justify-between shadow-2xs"
+                  >
+                    {/* Uploaded Product Photo */}
+                    <div className="relative aspect-[16/10] bg-stone-100 overflow-hidden">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={title}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-stone-400">
+                          <Camera className="w-8 h-8" />
                         </div>
-                      </td>
+                      )}
+                      <div className="absolute top-2.5 start-2.5 px-2.5 py-1 rounded-md text-[10px] font-bold bg-black/70 text-white">
+                        {isExpired
+                          ? isArabic ? 'منتهي الصلاحية' : 'Expired'
+                          : isSoldOut
+                            ? isArabic ? 'نفدت الكمية' : 'Sold Out'
+                            : isPaused
+                              ? isArabic ? 'متوقف مؤقتاً' : 'Paused'
+                              : isArabic ? 'متاح للحجز' : 'Live'}
+                      </div>
+                    </div>
 
-                      {/* Category */}
-                      <td className="py-3 px-4 text-[#78716C] capitalize">
-                        {item.category}
-                      </td>
+                    {/* Item Details */}
+                    <div className="p-4 space-y-3 flex-1 flex flex-col justify-between text-xs">
+                      <div className="space-y-1">
+                        <h4 className="font-headline font-bold text-sm text-[#1C1917] line-clamp-1">
+                          {title}
+                        </h4>
+                        <div className="flex items-center justify-between text-[11px] text-[#78716C] font-metric">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-amber-600" />
+                            <span>{item.pickupWindow}</span>
+                          </span>
+                          <span>
+                            {isArabic ? 'ربحك الصافي/قطعة:' : 'Your Net/unit:'}{' '}
+                            <strong className="text-[#059669] tabular-nums">
+                              {merchantNetPerUnitAed.toFixed(2)} {t.currency}
+                            </strong>
+                          </span>
+                        </div>
+                      </div>
 
-                      {/* Stock with inline counter controls */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
+                      {/* Price & Stock Controls */}
+                      <div className="flex items-center justify-between pt-2 border-t border-[#F5EFEB]">
+                        <div className="font-metric">
+                          <span className="text-[10px] text-stone-400 line-through block">
+                            {item.originalPrice.toFixed(2)} {t.currency}
+                          </span>
+                          <strong className="text-base font-extrabold text-[#1C1917] tabular-nums">
+                            {item.discountedPrice.toFixed(2)} {t.currency}
+                          </strong>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
                           <button
+                            type="button"
                             onClick={() => onUpdateStock(item.id, -1)}
                             disabled={item.stock <= 0}
-                            className="w-7 h-7 rounded border border-[#EAE4DC] bg-white hover:bg-amber-50 disabled:opacity-30 text-[#1C1917] flex items-center justify-center font-bold cursor-pointer"
+                            className="w-8 h-8 rounded-lg border border-[#EAE4DC] bg-[#FAF7F2] hover:bg-amber-50 disabled:opacity-30 text-[#1C1917] font-bold cursor-pointer"
                           >
                             -
                           </button>
-                          <span className="font-metric font-extrabold text-sm text-[#1C1917] w-6 text-center">
+                          <span className="font-metric font-extrabold text-sm w-7 text-center tabular-nums">
                             {item.stock}
                           </span>
                           <button
+                            type="button"
                             onClick={() => onUpdateStock(item.id, 1)}
-                            className="w-7 h-7 rounded border border-[#EAE4DC] bg-white hover:bg-amber-50 text-[#1C1917] flex items-center justify-center font-bold cursor-pointer"
+                            className="w-8 h-8 rounded-lg border border-[#EAE4DC] bg-[#FAF7F2] hover:bg-amber-50 text-[#1C1917] font-bold cursor-pointer"
                           >
                             +
                           </button>
                         </div>
-                      </td>
+                      </div>
 
-                      {/* Rescue Price */}
-                      <td className="py-3 px-4 font-metric">
-                        <span className="text-stone-400 line-through text-[11px] me-1">
-                          {item.originalPrice}
-                        </span>
-                        <strong className="text-[#DC2626] font-bold text-sm">
-                          {item.discountedPrice} {t.currency}
-                        </strong>
-                      </td>
-
-                      {/* Pickup Window (Clickable to edit offer time directly) */}
-                      <td className="py-3 px-4 font-metric text-[#1C1917]">
+                      {/* Actions */}
+                      <div className="flex items-center gap-1.5 pt-1">
                         <button
                           type="button"
                           onClick={() => handleOpenEditModal(item)}
-                          title={isArabic ? 'انقر لتعديل وقت العرض أو تفاصيل الصنف' : 'Click to edit offer pickup time or details'}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#FEF3C7] hover:bg-amber-200 text-[#78350F] text-[11px] font-bold border border-[#FDE68A] transition-colors cursor-pointer"
+                          className="flex-1 py-2 px-2.5 rounded-lg text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-200 cursor-pointer"
                         >
-                          <Clock className="w-3 h-3 text-[#92400E]" />
-                          <span>{item.pickupWindow}</span>
-                          <span className="text-[10px] underline ms-1">{isArabic ? 'تعديل' : 'Edit'}</span>
+                          {isArabic ? 'تعديل السعر والصنف' : 'Edit Item'}
                         </button>
-                      </td>
-
-                      {/* Expiry & Allergens */}
-                      <td className="py-3 px-4 text-[11px]">
-                        {item.expiryTime && (
-                          <div className="font-metric font-semibold text-stone-700">
-                            {isArabic ? 'ينتهي: ' : 'Exp: '}
-                            {new Date(item.expiryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                        )}
-                        {item.allergens && item.allergens.length > 0 && (
-                          <div className="text-[10px] text-amber-800">
-                            ⚠️ {item.allergens.join(', ')}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Revenue */}
-                      <td className="py-3 px-4 font-metric font-bold text-[#059669]">
-                        +{item.revenueAed} {t.currency}
-                      </td>
-
-                      {/* Actions: Edit Item & Time, Pause/Resume, Delete */}
-                      <td className="py-3 px-5 text-end">
-                        <div className="inline-flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => onToggleStatus(item.id)}
+                          className="py-2 px-2.5 rounded-lg text-xs font-semibold border border-[#EAE4DC] bg-[#FAF7F2] hover:bg-stone-100 text-stone-700 cursor-pointer"
+                        >
+                          {isPaused ? t.resumeListing : t.pauseListing}
+                        </button>
+                        {onDeleteListing && (
                           <button
                             type="button"
-                            onClick={() => handleOpenEditModal(item)}
-                            className="px-2.5 py-1.5 rounded text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 transition-all cursor-pointer"
+                            onClick={() => onDeleteListing(item.id)}
+                            title={isArabic ? 'حذف الصنف' : 'Delete'}
+                            className="p-2 rounded-lg text-red-600 hover:bg-red-50 border border-red-200/70 cursor-pointer"
                           >
-                            {isArabic ? 'تعديل الصنف والوقت ✏️' : 'Edit ✏️'}
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => onToggleStatus(item.id)}
-                            className={`px-2.5 py-1.5 rounded text-xs font-semibold border transition-all cursor-pointer ${
-                              isPaused
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
-                                : 'bg-[#FAF7F2] text-stone-700 border-[#EAE4DC] hover:bg-amber-50'
-                            }`}
-                          >
-                            {isPaused ? t.resumeListing : t.pauseListing}
-                          </button>
-                          {onDeleteListing && (
-                            <button
-                              type="button"
-                              onClick={() => onDeleteListing(item.id)}
-                              title={isArabic ? 'حذف الصنف' : 'Delete Listing'}
-                              className="p-1.5 rounded text-xs text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition-all cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -992,7 +1196,6 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
               const isCollected = order.status === 'collected';
               const title = isArabic ? order.item.title.ar : order.item.title.en;
               const currentStatus = order.workflowStatus || (isCollected ? 'collected' : 'ready');
-              const isDelivery = order.fulfillmentType === 'delivery';
 
               return (
                 <div 
@@ -1027,44 +1230,80 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
                       {title}
                     </h4>
                     <p className="text-xs text-[#78716C]">
-                      {order.quantity}x {isArabic ? 'وجبة فائض' : 'surplus meal'} • <strong className="text-[#1C1917] font-metric">{order.totalAed} {t.currency}</strong>
+                      {order.quantity}x {isArabic ? 'وجبة فائض' : 'surplus meal'} • <strong className="text-[#1C1917] font-metric">{order.totalAed.toFixed(2)} {t.currency}</strong>
                     </p>
                   </div>
 
-                  {/* Fulfillment mode: Self-Pickup vs Delivery */}
-                  <div className={`p-2.5 rounded-lg text-xs font-semibold flex items-center justify-between ${
-                    isDelivery 
-                      ? 'bg-amber-50 text-amber-900 border border-amber-200' 
-                      : 'bg-emerald-50 text-emerald-900 border border-emerald-200'
-                  }`}>
+                  {/* Fulfillment mode: Strictly Self-Pickup */}
+                  <div className="p-2.5 rounded-lg text-xs font-semibold flex items-center justify-between bg-emerald-50 text-emerald-900 border border-emerald-200">
                     <div className="flex items-center gap-2">
-                      {isDelivery ? <Truck className="w-4 h-4 text-amber-600" /> : <Store className="w-4 h-4 text-emerald-600" />}
-                      <span>{isDelivery ? (isArabic ? 'توصيل مباشر من المطعم (0 د.إ رسوم منصة)' : 'Direct Restaurant Delivery') : (isArabic ? 'استلام ذاتي من الكاونتر' : 'Counter Pickup')}</span>
+                      <Store className="w-4 h-4 text-emerald-600" />
+                      <span>{isArabic ? 'استلام شخصي من الكاونتر فقط' : 'Self-Pickup at Counter'}</span>
                     </div>
                     <span className="font-metric text-[11px] font-bold">
                       {order.pickupStart} - {order.pickupEnd}
                     </span>
                   </div>
 
-                  {/* Payment Method Badge */}
-                  <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-lg bg-[#FAF7F2] border border-[#EAE4DC]">
-                    <span className="text-[#78716C] flex items-center gap-1 font-medium">
-                      <CreditCard className="w-3.5 h-3.5" />
-                      {isArabic ? 'طريقة الدفع:' : 'Payment:'}
-                    </span>
-                    <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${
-                      order.paymentMethod === 'pickup_cash'
-                        ? 'text-amber-900 bg-amber-100 border border-amber-300'
-                        : 'text-emerald-900 bg-emerald-100 border border-emerald-300'
-                    }`}>
-                      {order.paymentMethod === 'pickup_cash'
-                        ? (isArabic ? '💵 نقداً عند الاستلام بالفرع' : '💵 Cash on Pickup')
-                        : (isArabic ? '💳 مدفوع إلكترونياً (Ziina / بطاقة)' : '💳 Paid Online (Ziina / Card)')
-                      }
-                    </span>
-                  </div>
+                  {/* Payment Method & Exact Per-Order Settlement Breakdown */}
+                  {(() => {
+                    const ledger = computeOrderLedger(order);
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-lg bg-[#FAF7F2] border border-[#EAE4DC]">
+                          <span className="text-[#78716C] flex items-center gap-1 font-medium">
+                            <CreditCard className="w-3.5 h-3.5" />
+                            {isArabic ? 'طريقة الدفع:' : 'Payment:'}
+                          </span>
+                          <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${
+                            ledger.isCash
+                              ? 'text-amber-900 bg-amber-100 border border-amber-300'
+                              : 'text-emerald-900 bg-emerald-100 border border-emerald-300'
+                          }`}>
+                            {ledger.isCash
+                              ? (isArabic ? 'نقداً عند الاستلام بالفرع' : 'Cash on Pickup')
+                              : (isArabic ? 'مدفوع إلكترونياً للمنصة' : 'Paid Online')}
+                          </span>
+                        </div>
 
-                  {/* Customer Info & Address if delivery */}
+                        <div
+                          className={`p-2.5 rounded-lg border text-[11px] font-metric space-y-1 ${
+                            ledger.isCash
+                              ? 'bg-amber-50/70 border-amber-300 text-amber-950'
+                              : 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
+                          }`}
+                        >
+                          <div className="flex justify-between">
+                            <span className="font-sans">{isArabic ? 'صافي ربح متجرك:' : 'Your Net Profit:'}</span>
+                            <strong className="text-[#059669] tabular-nums">
+                              +{filsToAed(ledger.merchantNetEarningsFils).toFixed(2)} {t.currency}
+                            </strong>
+                          </div>
+                          {ledger.isCash ? (
+                            <div className="flex justify-between">
+                              <span className="font-sans font-bold text-[#DC2626]">
+                                {isArabic ? 'عليك تدفعه لنا (نقدي):' : 'You Owe Flaster (Cash):'}
+                              </span>
+                              <strong className="text-[#DC2626] tabular-nums">
+                                {filsToAed(ledger.merchantOwesPlatformFils).toFixed(2)} {t.currency}
+                              </strong>
+                            </div>
+                          ) : (
+                            <div className="flex justify-between">
+                              <span className="font-sans font-bold text-[#059669]">
+                                {isArabic ? 'علينا ندفعه لك (إلكتروني):' : 'Flaster Owes You (Online):'}
+                              </span>
+                              <strong className="text-[#059669] tabular-nums">
+                                +{filsToAed(ledger.platformOwesMerchantFils).toFixed(2)} {t.currency}
+                              </strong>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Customer Info */}
                   <div className="p-3 bg-[#FAF7F2] rounded-lg text-[11px] text-[#44403C] space-y-1 border border-[#EAE4DC]">
                     <div className="flex justify-between">
                       <span className="text-[#78716C]">{isArabic ? 'الزبون:' : 'Customer:'}</span>
@@ -1074,12 +1313,6 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
                       <span className="text-[#78716C]">{isArabic ? 'الهاتف:' : 'Phone:'}</span>
                       <span className="font-metric font-semibold text-[#1C1917]">{order.customerPhone || '+971 50 123 4567'}</span>
                     </div>
-                    {isDelivery && order.deliveryAddress && (
-                      <div className="pt-1 border-t border-[#EAE4DC] text-amber-900">
-                        <span className="font-bold block">{isArabic ? 'عنوان التوصيل:' : 'Delivery Address:'}</span>
-                        <p>{order.deliveryAddress}</p>
-                      </div>
-                    )}
                   </div>
 
                   {/* Status Stepper Progression */}
@@ -1117,14 +1350,14 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
                       </button>
 
                       <button
-                        onClick={() => onUpdateOrderStatus && onUpdateOrderStatus(order.id, isDelivery ? 'delivered' : 'picked_up')}
+                        onClick={() => onUpdateOrderStatus && onUpdateOrderStatus(order.id, 'picked_up')}
                         className={`py-1.5 px-0.5 rounded text-[10px] font-bold transition-all border cursor-pointer ${
                           currentStatus === 'picked_up' || currentStatus === 'delivered'
                             ? 'bg-[#DC2626] text-white border-red-700 shadow-xs'
                             : 'bg-white text-stone-700 border-[#EAE4DC] hover:bg-amber-50'
                         }`}
                       >
-                        {isDelivery ? (isArabic ? 'تم التوصيل 🛵' : 'Delivered 🛵') : (isArabic ? 'تم الاستلام 🛍️' : 'Picked Up 🛍️')}
+                        {isArabic ? 'تم الاستلام 🛍️' : 'Picked Up 🛍️'}
                       </button>
 
                       <button
@@ -1165,179 +1398,7 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
         </div>
       )}
 
-      {/* TAB 3: Operational Delivery & Courier Dispatch Management (No founder Q&A essay) */}
-      {workspaceTab === 'logistics_guide' && (
-        <div className="space-y-6 animate-in fade-in">
-          {courierToast && (
-            <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 text-xs font-bold flex items-center justify-between shadow-sm">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>{courierToast}</span>
-              </div>
-              <button onClick={() => setCourierToast(null)} className="font-bold cursor-pointer">✕</button>
-            </div>
-          )}
-
-          {/* Active Courier Configuration Card */}
-          <div className="bg-[#FFFDF9] rounded-2xl border border-[#EAE4DC] p-6 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#EAE4DC] pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-amber-400 text-stone-950 flex items-center justify-center font-bold shadow-xs">
-                  <Truck className="w-6 h-6 text-[#DC2626]" />
-                </div>
-                <div>
-                  <h3 className="font-headline font-extrabold text-base sm:text-lg text-[#1C1917]">
-                    {isArabic ? 'إدارة التوصيل الذاتي للمطعم 🛵' : 'Direct Restaurant Self-Delivery 🛵'}
-                  </h3>
-                  <p className="text-xs text-[#78716C]">
-                    {isArabic
-                      ? 'كل مطعم يتولى توصيل طلباته مباشرة عبر سائقه الخاص، وإرسال العنوان للسائق بضغطة زر'
-                      : 'Each restaurant handles delivery directly using its own driver and 1-click WhatsApp dispatch'}
-                  </p>
-                </div>
-              </div>
-              <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold">
-                {isArabic ? 'التوصيل مسؤولية المطعم مباشرة (0 د.إ رسوم منصة)' : 'Restaurant Self-Delivery (0 AED Platform Fee)'}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs items-end">
-              <div>
-                <label className="block font-bold text-[#1C1917] mb-1.5">
-                  {isArabic ? 'اسم المندوب أو شركة التوصيل المعتمدة:' : 'Active Courier / Driver Name:'}
-                </label>
-                <input
-                  type="text"
-                  value={courierName}
-                  onChange={(e) => setCourierName(e.target.value)}
-                  className="w-full h-10 px-3 bg-[#FAF7F2] border border-[#EAE4DC] rounded-xl text-xs text-[#1C1917]"
-                />
-              </div>
-              <div>
-                <label className="block font-bold text-[#1C1917] mb-1.5">
-                  {isArabic ? 'رقم واتساب المندوب (لإرسال المواقع):' : 'Courier WhatsApp Number:'}
-                </label>
-                <input
-                  type="tel"
-                  value={courierPhone}
-                  onChange={(e) => setCourierPhone(e.target.value)}
-                  className="w-full h-10 px-3 bg-[#FAF7F2] border border-[#EAE4DC] rounded-xl text-xs font-metric text-[#1C1917]"
-                />
-              </div>
-              <div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCourierToast(
-                      isArabic
-                        ? `✓ تم حفظ بيانات المندوب (${courierName} - ${courierPhone}) بنجاح!`
-                        : `✓ Saved active courier (${courierName})!`
-                    );
-                    setTimeout(() => setCourierToast(null), 3500);
-                  }}
-                  className="w-full h-10 rounded-xl bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs cursor-pointer shadow-xs transition-all"
-                >
-                  {isArabic ? 'حفظ بيانات المندوب المعتمد ✓' : 'Save Courier Info ✓'}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Delivery Orders Queue */}
-          <div className="bg-[#FFFDF9] rounded-2xl border border-[#EAE4DC] p-6 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="font-headline font-bold text-sm sm:text-base text-[#1C1917] flex items-center gap-2">
-                <Truck className="w-4 h-4 text-[#DC2626]" />
-                <span>{isArabic ? 'الطلبات المطلوب توصيلها للمنازل:' : 'Orders Requiring Home Delivery:'}</span>
-              </h4>
-              <span className="font-metric text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-950 border border-amber-300">
-                {orders.filter((o) => o.fulfillmentType === 'delivery').length} {isArabic ? 'طلب توصيل' : 'delivery orders'}
-              </span>
-            </div>
-
-            {orders.filter((o) => o.fulfillmentType === 'delivery').length === 0 ? (
-              <div className="p-8 text-center bg-[#FAF7F2] rounded-xl border border-[#EAE4DC] text-xs text-[#78716C] space-y-2">
-                <Truck className="w-8 h-8 text-amber-500 mx-auto" />
-                <p className="font-bold text-[#1C1917]">
-                  {isArabic ? 'جميع الطلبات الحالية هي استلام ذاتي من الفرع' : 'All current orders are counter self-pickup'}
-                </p>
-                <p>
-                  {isArabic
-                    ? 'عندما يختار أي زبون خيار "توصيل مباشر من المطعم"، سيظهر طلبه وعنوانه هنا فوراً لتسليمه عبر سائق المطعم.'
-                    : 'Whenever a customer selects Direct Restaurant Delivery, their order and address will appear here for your restaurant driver.'}
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                {orders
-                  .filter((o) => o.fulfillmentType === 'delivery')
-                  .map((order) => {
-                    const itemTitle = isArabic ? order.item.title.ar : order.item.title.en;
-                    const merchantTitle = isArabic ? order.item.merchant.nameAr : order.item.merchant.name;
-                    const courierDigits = courierPhone.replace(/[^0-9]/g, '') || '971501234567';
-                    const dispatchMsg = isArabic
-                      ? `🛵 *طلب توصيل جديد - فلاستر Flaster*\n• رقم الطلب: ${order.code}\n• استلام من مطعم: ${merchantTitle}\n• الوجبة: ${order.quantity}x ${itemTitle}\n• اسم الزبون: ${order.customerName || 'عميل'}\n• جوال الزبون: ${order.customerPhone || ''}\n• عنوان التوصيل: ${order.deliveryAddress || 'رأس الخيمة'}\n• طريقة الدفع: ${order.paymentMethod === 'pickup_cash' ? `تحصيل نقدي (${order.totalAed} درهم)` : 'مدفوع إلكترونياً بالكامل ✓'}`
-                      : `🛵 *New Delivery Dispatch - Flaster*\n• Order: ${order.code}\n• Pickup from: ${merchantTitle}\n• Item: ${order.quantity}x ${itemTitle}\n• Customer: ${order.customerName || 'Customer'} (${order.customerPhone || ''})\n• Address: ${order.deliveryAddress || 'RAK'}`;
-
-                    return (
-                      <div
-                        key={order.id}
-                        className="p-4 rounded-xl bg-[#FAF7F2] border border-[#EAE4DC] space-y-3"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-metric font-extrabold text-sm text-[#DC2626] bg-red-50 px-2.5 py-0.5 rounded border border-red-200">
-                            {order.code}
-                          </span>
-                          <span className="font-bold text-[#059669]">
-                            {order.totalAed} AED ({order.paymentMethod === 'pickup_cash' ? (isArabic ? 'كاش' : 'Cash') : (isArabic ? 'مدفوع' : 'Paid')})
-                          </span>
-                        </div>
-
-                        <div className="space-y-1">
-                          <p className="font-bold text-[#1C1917]">{order.quantity}x {itemTitle}</p>
-                          <p className="text-[#78716C]">{isArabic ? 'المطعم:' : 'Store:'} {merchantTitle}</p>
-                          <p className="text-[#1C1917] font-semibold">
-                            📍 {isArabic ? 'عنوان الزبون:' : 'Address:'} {order.deliveryAddress || (isArabic ? 'رأس الخيمة - الشريشة' : 'Ras Al Khaimah')}
-                          </p>
-                          <p className="text-[#78716C] font-metric">
-                            📞 {order.customerName} • {order.customerPhone}
-                          </p>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#EAE4DC]">
-                          <a
-                            href={`https://wa.me/${courierDigits}?text=${encodeURIComponent(dispatchMsg)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1 py-2 px-3 rounded-lg bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs"
-                          >
-                            <MessageSquare className="w-3.5 h-3.5" />
-                            <span>{isArabic ? 'إرسال الطلب للمندوب بالواتساب 🛵' : 'Send to Courier via WhatsApp 🛵'}</span>
-                          </a>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (onUpdateOrderStatus) onUpdateOrderStatus(order.id, 'delivered');
-                              onMarkOrderCollected(order.id);
-                              setCourierToast(isArabic ? `✓ تم تأكيد توصيل الطلب ${order.code} بنجاح!` : `✓ Order ${order.code} marked delivered!`);
-                              setTimeout(() => setCourierToast(null), 3500);
-                            }}
-                            className="py-2 px-3 rounded-lg bg-amber-400 hover:bg-amber-500 text-stone-950 font-bold text-xs cursor-pointer"
-                          >
-                            {isArabic ? 'تم التوصيل ✓' : 'Delivered ✓'}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: Honest Bank Account Details & Financial Settlement Records */}
+      {/* TAB 3: Honest Bank Account Details & Financial Settlement Records */}
       {workspaceTab === 'settlements' && (
         <div className="space-y-6 animate-in fade-in">
           
@@ -1457,47 +1518,69 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
             </div>
           </div>
 
-          {/* Financial Breakdown KPI Cards */}
+          {/* Financial Breakdown KPI Cards: Cash vs Online Settlement */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 font-metric">
             
             <div className="bg-[#FFFDF9] rounded-xl p-4 border border-[#EAE4DC] shadow-xs space-y-1">
-              <span className="text-xs text-[#78716C] block">{isArabic ? 'إجمالي المبيعات' : 'Gross Sales'}</span>
-              <div className="text-xl font-bold text-[#1C1917]">
-                {totalGrossSales.toFixed(2)} <span className="text-xs font-semibold text-[#78716C]">{t.currency}</span>
-              </div>
-              <span className="text-[10px] text-[#78716C] block">{orders.length} {isArabic ? 'طلب معتمد' : 'orders'}</span>
-            </div>
-
-            <div className="bg-[#FFFDF9] rounded-xl p-4 border border-[#EAE4DC] shadow-xs space-y-1">
-              <span className="text-xs text-[#78716C] block">{isArabic ? 'مدفوع عبر زينا (Ziina)' : 'Online Payments'}</span>
+              <span className="text-xs text-[#78716C] block">{isArabic ? 'صافي أرباح متجرك' : 'Your Net Earnings'}</span>
               <div className="text-xl font-bold text-[#059669]">
-                {electronicSales.toFixed(2)} <span className="text-xs font-semibold text-[#059669]">{t.currency}</span>
+                {merchantNetEarningsTotal.toFixed(2)} <span className="text-xs font-semibold text-[#059669]">{t.currency}</span>
               </div>
-              <span className="text-[10px] text-[#059669] block">{electronicOrders.length} {isArabic ? 'طلب إلكتروني' : 'online orders'}</span>
+              <span className="text-[10px] text-[#78716C] block">
+                {isArabic ? `من إجمالي مبيعات ${totalGrossSales.toFixed(2)} د.إ` : `From ${totalGrossSales.toFixed(2)} AED sales`}
+              </span>
             </div>
 
-            <div className="bg-[#FFFDF9] rounded-xl p-4 border border-[#EAE4DC] shadow-xs space-y-1">
-              <span className="text-xs text-[#78716C] block">{isArabic ? 'نقد مستلم بالفرع' : 'Counter Cash'}</span>
-              <div className="text-xl font-bold text-amber-700">
-                {cashSales.toFixed(2)} <span className="text-xs font-semibold text-amber-600">{t.currency}</span>
+            <div className="bg-emerald-50/70 rounded-xl p-4 border border-emerald-200 shadow-xs space-y-1">
+              <span className="text-xs text-emerald-900 font-bold block">{isArabic ? 'علينا ندفعه لك (إلكتروني)' : 'Platform Owes You (Online)'}</span>
+              <div className="text-xl font-bold text-[#059669]">
+                {platformOwesMerchantTotal.toFixed(2)} <span className="text-xs font-semibold text-[#059669]">{t.currency}</span>
               </div>
-              <span className="text-[10px] text-amber-700 block">{cashOrders.length} {isArabic ? 'طلب كاش' : 'cash orders'}</span>
+              <span className="text-[10px] text-emerald-800 block">
+                {electronicOrders.length} {isArabic ? `طلب إلكتروني (${electronicSales.toFixed(2)} د.إ)` : `online (${electronicSales.toFixed(2)} AED)`}
+              </span>
             </div>
 
-            <div className="bg-[#FFFDF9] rounded-xl p-4 border border-[#EAE4DC] shadow-xs space-y-1">
-              <span className="text-xs text-[#78716C] block">{isArabic ? `عمولة المنصة (${platformCommissionPercent}%)` : `Platform Fee (${platformCommissionPercent}%)`}</span>
+            <div className="bg-red-50/70 rounded-xl p-4 border border-red-200 shadow-xs space-y-1">
+              <span className="text-xs text-red-900 font-bold block">{isArabic ? 'عليك تدفعه لنا (نقدي)' : 'You Owe Platform (Cash)'}</span>
               <div className="text-xl font-bold text-[#DC2626]">
-                -{platformCommissionTotal.toFixed(2)} <span className="text-xs font-semibold text-[#DC2626]">{t.currency}</span>
+                {merchantOwesPlatformTotal.toFixed(2)} <span className="text-xs font-semibold text-[#DC2626]">{t.currency}</span>
               </div>
-              <span className="text-[10px] text-[#DC2626] block">{isArabic ? 'حصة منصة فلاستر' : 'Flaster commission'}</span>
+              <span className="text-[10px] text-red-800 block">
+                {cashOrders.length} {isArabic ? `طلب نقدي (${cashSales.toFixed(2)} د.إ)` : `cash (${cashSales.toFixed(2)} AED)`}
+              </span>
             </div>
 
-            <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-300 shadow-xs space-y-1">
-              <span className="text-xs text-emerald-900 font-bold block">{isArabic ? 'صافي مستحقات المتجر' : 'Net Store Payout'}</span>
-              <div className="text-2xl font-black text-[#059669]">
-                {netBankPayout.toFixed(2)} <span className="text-xs font-semibold text-emerald-700">{t.currency}</span>
+            <div className="bg-[#FFFDF9] rounded-xl p-4 border border-[#EAE4DC] shadow-xs space-y-1">
+              <span className="text-xs text-[#78716C] block">{isArabic ? `عمولة المنصة (${effectiveCommissionPercent}%)` : `Platform Fee (${effectiveCommissionPercent}%)`}</span>
+              <div className="text-xl font-bold text-[#1C1917]">
+                {platformCommissionTotal.toFixed(2)} <span className="text-xs font-semibold text-[#78716C]">{t.currency}</span>
               </div>
-              <span className="text-[10px] text-emerald-800 font-semibold block">{isArabic ? 'المبلغ الصافي للتحويل' : 'Net transfer amount'}</span>
+              <span className="text-[10px] text-[#78716C] block">{validOrders.length} {isArabic ? 'طلب معتمد' : 'valid orders'}</span>
+            </div>
+
+            <div className={`rounded-xl p-4 border shadow-xs space-y-1 ${
+              netBalanceFils >= 0
+                ? 'bg-emerald-50 border-emerald-300'
+                : 'bg-amber-50 border-amber-300'
+            }`}>
+              <span className={`text-xs font-bold block ${
+                netBalanceFils >= 0 ? 'text-emerald-900' : 'text-amber-950'
+              }`}>
+                {netBalanceFils >= 0
+                  ? (isArabic ? 'صافي التسوية: علينا لك' : 'Net: Platform Pays You')
+                  : (isArabic ? 'صافي التسوية: عليك لنا' : 'Net: You Pay Platform')}
+              </span>
+              <div className={`text-2xl font-black ${
+                netBalanceFils >= 0 ? 'text-[#059669]' : 'text-amber-800'
+              }`}>
+                {netBalanceAed.toFixed(2)} <span className="text-xs font-semibold">{t.currency}</span>
+              </div>
+              <span className="text-[10px] text-[#57534E] font-semibold block">
+                {netBalanceFils >= 0
+                  ? (isArabic ? 'يُحوَّل لحساب متجرك' : 'Transfer to your bank')
+                  : (isArabic ? 'مستحق التحويل للمنصة' : 'Due to Flaster')}
+              </span>
             </div>
 
           </div>
@@ -1507,9 +1590,9 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
             <div className="px-5 py-4 border-b border-[#EAE4DC] flex items-center justify-between">
               <h4 className="font-headline font-bold text-sm text-[#1C1917] flex items-center gap-2">
                 <FileSpreadsheet className="w-4 h-4 text-[#DC2626]" />
-                <span>{isArabic ? 'تفاصيل تسوية طلبات الدورة الحالية' : 'Current Settlement Period Orders'}</span>
+                <span>{isArabic ? 'كشف حساب الطلبات (نقدي vs إلكتروني)' : 'Order Settlement Ledger (Cash vs Online)'}</span>
               </h4>
-              <span className="font-metric text-xs text-[#78716C]">{orders.length} {isArabic ? 'سجل' : 'records'}</span>
+              <span className="font-metric text-xs text-[#78716C]">{validOrders.length} {isArabic ? 'طلب' : 'orders'}</span>
             </div>
 
             <div className="overflow-x-auto">
@@ -1517,37 +1600,64 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
                 <thead className="bg-[#FAF7F2] border-b border-[#EAE4DC] text-[#78716C] font-bold uppercase text-[10px]">
                   <tr>
                     <th className="px-4 py-3">{isArabic ? 'رقم الطلب' : 'Code'}</th>
-                    <th className="px-4 py-3">{isArabic ? 'الوجبة' : 'Item'}</th>
-                    <th className="px-4 py-3">{isArabic ? 'القناة' : 'Payment'}</th>
-                    <th className="px-4 py-3 text-end">{isArabic ? 'المبلغ الإجمالي' : 'Gross'}</th>
-                    <th className="px-4 py-3 text-end">{isArabic ? `العمولة (${platformCommissionPercent}%)` : `Fee (${platformCommissionPercent}%)`}</th>
-                    <th className="px-4 py-3 text-end">{isArabic ? 'صافي التاجر' : 'Net Share'}</th>
+                    <th className="px-4 py-3">{isArabic ? 'صنف الطعام' : 'Food Item'}</th>
+                    <th className="px-4 py-3">{isArabic ? 'طريقة الدفع' : 'Payment'}</th>
+                    <th className="px-4 py-3 text-end">{isArabic ? 'سعر الصنف' : 'Item Base'}</th>
+                    <th className="px-4 py-3 text-end">{isArabic ? 'صافي ربحك' : 'Your Profit'}</th>
+                    <th className="px-4 py-3 text-end">{isArabic ? 'التسوية (لنا / لك)' : 'Settlement'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#EAE4DC] font-metric">
-                  {orders.map((order) => {
-                    const gross = order.totalAed;
-                    const fee = Number((gross * (platformCommissionPercent / 100)).toFixed(2));
-                    const net = Number((gross - fee).toFixed(2));
-                    const isCash = order.paymentMethod === 'pickup_cash';
+                  {validOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-[#78716C] font-sans">
+                        {isArabic
+                          ? 'لا توجد طلبات مسجلة لهذا المتجر حتى الآن.'
+                          : 'No orders recorded for this store yet.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    validOrders.map((order) => {
+                      const l = computeOrderLedger(order);
 
-                    return (
-                      <tr key={order.id} className="hover:bg-[#FAF7F2] transition-colors">
-                        <td className="px-4 py-3 font-bold text-[#1C1917]">{order.code}</td>
-                        <td className="px-4 py-3 text-[#57534E]">{isArabic ? order.item.title.ar : order.item.title.en}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            isCash ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-                          }`}>
-                            {isCash ? (isArabic ? 'كاش بالفرع' : 'Cash') : (isArabic ? 'إلكتروني (Ziina)' : 'Online (Ziina)')}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-end font-semibold text-[#1C1917]">{gross.toFixed(2)} AED</td>
-                        <td className="px-4 py-3 text-end text-[#DC2626]">-{fee.toFixed(2)} AED</td>
-                        <td className="px-4 py-3 text-end font-bold text-[#059669]">{net.toFixed(2)} AED</td>
-                      </tr>
-                    );
-                  })}
+                      return (
+                        <tr key={order.id} className="hover:bg-[#FAF7F2] transition-colors">
+                          <td className="px-4 py-3 font-bold text-[#1C1917]">{order.code}</td>
+                          <td className="px-4 py-3 text-[#57534E]">
+                            {isArabic ? order.item.title.ar : order.item.title.en} × {order.quantity}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              l.isCash ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                              {l.isCash ? (isArabic ? 'نقدي بالفرع' : 'Cash') : (isArabic ? 'دفع إلكتروني' : 'Online')}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-end font-semibold text-[#1C1917]">
+                            {filsToAed(l.merchantSubtotalFils).toFixed(2)} AED
+                          </td>
+                          <td className="px-4 py-3 text-end font-bold text-[#059669]">
+                            {filsToAed(l.merchantNetEarningsFils).toFixed(2)} AED
+                          </td>
+                          <td className="px-4 py-3 text-end font-bold">
+                            {l.isCash ? (
+                              <span className="text-[#DC2626]">
+                                {isArabic
+                                  ? `عليك لنا: ${filsToAed(l.merchantOwesPlatformFils).toFixed(2)} د.إ`
+                                  : `You owe: ${filsToAed(l.merchantOwesPlatformFils).toFixed(2)} AED`}
+                              </span>
+                            ) : (
+                              <span className="text-[#059669]">
+                                {isArabic
+                                  ? `علينا لك: ${filsToAed(l.platformOwesMerchantFils).toFixed(2)} د.إ`
+                                  : `We owe you: ${filsToAed(l.platformOwesMerchantFils).toFixed(2)} AED`}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1646,16 +1756,15 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
                   </div>
                 </div>
 
-                {/* 2. Package Names (English & Arabic) */}
+                {/* 2. Food Item Names */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
                     <label className="block font-semibold text-[#1C1917] mb-1.5">
-                      {lang === 'ar' ? 'اسم صنف الفائض (عربي) *' : 'Surplus Item Name (Arabic) *'}
+                      {lang === 'ar' ? 'اسم صنف الطعام (عربي) *' : 'Food Item Name (Arabic)'}
                     </label>
                     <input
                       type="text"
-                      required
-                      placeholder={isArabic ? 'مثال: برياني لحم فاخر أو بوكس كرواسون' : 'e.g. Royal Mutton Biryani'}
+                      placeholder={isArabic ? 'مثال: برياني لحم طازج أو كرواسون بالزبدة' : 'e.g. Fresh Mutton Biryani'}
                       value={formData.titleAr}
                       onChange={(e) => setFormData({ ...formData, titleAr: e.target.value })}
                       className="w-full h-11 px-3 bg-white border border-[#EAE4DC] rounded-xl text-xs text-[#1C1917] focus:outline-none focus:border-[#DC2626]"
@@ -1664,12 +1773,11 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
 
                   <div>
                     <label className="block font-semibold text-[#1C1917] mb-1.5">
-                      {lang === 'ar' ? 'اسم الصنف (إنجليزي) *' : 'Item Name (English) *'}
+                      {lang === 'ar' ? 'اسم الصنف (إنجليزي)' : 'Food Item Name (English)'}
                     </label>
                     <input
                       type="text"
-                      required
-                      placeholder="e.g. Royal Biryani Feast Box"
+                      placeholder="e.g. Fresh Mutton Biryani"
                       value={formData.title}
                       onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                       className="w-full h-11 px-3 bg-white border border-[#EAE4DC] rounded-xl text-xs text-[#1C1917] focus:outline-none focus:border-[#DC2626]"
@@ -1677,18 +1785,18 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
                   </div>
                 </div>
 
-                {/* 3. 📸 PHOTO UPLOADER & PRESETS SECTION */}
+                {/* 3. MANDATORY REAL PRODUCT PHOTO UPLOAD (Photo Bank Removed) */}
                 <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#EAE4DC] space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Camera className="w-4 h-4 text-[#DC2626]" />
                       <span className="font-bold text-xs text-[#1C1917]">
-                        {isArabic ? 'صورة الوجبة (رفع من الهاتف / الكاميرا أو اختيار من البنك)' : 'Dish Photo (Upload or Pick from Library)'}
+                        {isArabic ? 'صورة حقيقية لصنف الطعام * (إلزامي من جهازك أو الكاميرا)' : 'Real Product Photo * (Required from device or camera)'}
                       </span>
                     </div>
                     {formData.imageUrl && (
-                      <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                        ✓ {isArabic ? 'تم تعيين الصورة' : 'Photo Attached'}
+                      <span className="text-[11px] font-bold text-emerald-700">
+                        ✓ {isArabic ? 'تم رفع الصورة' : 'Photo Ready'}
                       </span>
                     )}
                   </div>
@@ -1703,30 +1811,29 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
                   />
 
                   {formData.imageUrl ? (
-                    /* Active Image Preview Card */
                     <div className="relative rounded-xl overflow-hidden border border-[#EAE4DC] bg-black/5 aspect-[16/9] max-h-48 group">
                       <img
                         src={formData.imageUrl}
-                        alt="Dish Preview"
+                        alt="Product Preview"
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 flex items-end justify-between p-3">
-                        <span className="text-[11px] text-white font-semibold bg-black/40 backdrop-blur-xs px-2.5 py-1 rounded-lg">
-                          {isArabic ? 'معاينة صورة الصنف' : 'Attached Photo Preview'}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 flex items-end justify-between p-3">
+                        <span className="text-[11px] text-white font-semibold bg-black/50 px-2.5 py-1 rounded-lg">
+                          {isArabic ? 'صورة المنتج المرفوعة' : 'Uploaded Product Photo'}
                         </span>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="px-3 py-1.5 rounded-lg bg-white/90 hover:bg-white text-stone-900 font-bold text-xs shadow-sm cursor-pointer transition-all flex items-center gap-1"
+                            className="px-3 py-1.5 rounded-lg bg-white hover:bg-stone-50 text-stone-900 font-bold text-xs shadow-sm cursor-pointer flex items-center gap-1"
                           >
                             <Upload className="w-3.5 h-3.5 text-[#DC2626]" />
                             <span>{isArabic ? 'تغيير الصورة' : 'Change'}</span>
                           </button>
                           <button
                             type="button"
-                            onClick={() => setFormData(prev => ({ ...prev, imageUrl: '' }))}
-                            className="px-2.5 py-1.5 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-xs shadow-sm cursor-pointer transition-all flex items-center gap-1"
+                            onClick={() => setFormData((prev) => ({ ...prev, imageUrl: '' }))}
+                            className="px-2.5 py-1.5 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-xs shadow-sm cursor-pointer"
                             title={isArabic ? 'حذف الصورة' : 'Remove Photo'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1735,61 +1842,32 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
                       </div>
                     </div>
                   ) : (
-                    /* Dropzone Button */
                     <div
                       onClick={() => fileInputRef.current?.click()}
-                      className="border-2 border-dashed border-amber-400 hover:border-[#DC2626] bg-white hover:bg-amber-50/40 rounded-xl p-5 text-center cursor-pointer transition-all space-y-1.5 group"
+                      className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all space-y-2 group ${
+                        imageValidationError
+                          ? 'border-red-500 bg-red-50/40'
+                          : 'border-amber-400 hover:border-[#DC2626] bg-white hover:bg-amber-50/40'
+                      }`}
                     >
-                      <div className="w-10 h-10 rounded-full bg-amber-100 text-[#DC2626] mx-auto flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <div className="w-11 h-11 rounded-full bg-amber-100 text-[#DC2626] mx-auto flex items-center justify-center group-hover:scale-105 transition-transform">
                         <Upload className="w-5 h-5" />
                       </div>
                       <p className="font-bold text-xs text-[#1C1917]">
-                        {isArabic ? 'اضغط هنا لرفع صورة الوجبة من ألبوم الصور أو التقاطها بالكاميرا' : 'Click to upload photo from your device or camera'}
+                        {isArabic ? 'اضغط هنا لرفع صورة حقيقية لصنف الطعام من جهازك أو الكاميرا' : 'Click to upload a real photo of your food item'}
                       </p>
                       <p className="text-[11px] text-[#78716C]">
-                        {isArabic ? 'يدعم الصور المباشرة (JPG, PNG, WebP) مع ضغط فوري سريع' : 'Supports JPG, PNG, WebP (compressed automatically)'}
+                        {isArabic ? 'يجب رفع صورة حقيقية لمنتجك (JPG, PNG, WebP) — لا توجد صور جاهزة' : 'Real product photo required (JPG, PNG, WebP)'}
                       </p>
                     </div>
                   )}
 
-                  {/* 1-Tap Preset Library */}
-                  <div className="space-y-1.5 pt-1">
-                    <span className="text-[11px] text-[#78716C] font-semibold block">
-                      {isArabic ? 'أو اختر بنقرة واحدة من بنك صور الأطباق المقترحة:' : 'Or choose from suggested dish library:'}
-                    </span>
-                    <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                      {CULINARY_PRESETS.map((preset) => {
-                        const isSelected = formData.imageUrl === preset.url;
-                        return (
-                          <button
-                            key={preset.id}
-                            type="button"
-                            onClick={() => setFormData(prev => ({ ...prev, imageUrl: preset.url }))}
-                            className={`relative aspect-square rounded-xl overflow-hidden border transition-all cursor-pointer group ${
-                              isSelected
-                                ? 'border-[#DC2626] ring-2 ring-[#DC2626] shadow-sm scale-102'
-                                : 'border-[#EAE4DC] hover:border-amber-400 opacity-85 hover:opacity-100'
-                            }`}
-                            title={isArabic ? preset.labelAr : preset.labelEn}
-                          >
-                            <img
-                              src={preset.url}
-                              alt={preset.labelEn}
-                              className="w-full h-full object-cover"
-                            />
-                            <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] font-bold text-center py-0.5 truncate px-1">
-                              {preset.emoji}
-                            </span>
-                            {isSelected && (
-                              <div className="absolute top-1 end-1 w-4 h-4 rounded-full bg-[#DC2626] text-white flex items-center justify-center text-[9px] shadow-xs">
-                                ✓
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
+                  {imageValidationError && (
+                    <div className="p-2.5 rounded-xl bg-red-50 border border-red-300 text-red-800 text-xs font-bold flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                      <span>{imageValidationError}</span>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* 4. Category & Stock */}
@@ -1834,46 +1912,124 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
                   </div>
                 </div>
 
-                {/* 5. Pricing: Regular vs Surplus Rescue Price */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  <div>
-                    <label className="block font-semibold text-[#1C1917] mb-1.5">
-                      {t.regularPriceAed} (سعر المنيو العادي) *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="1"
-                        required
-                        value={formData.originalPrice}
-                        onChange={(e) => setFormData({ ...formData, originalPrice: parseInt(e.target.value) || 0 })}
-                        className="w-full h-11 px-3 pe-12 bg-white border border-[#EAE4DC] rounded-xl text-sm font-metric text-[#1C1917] focus:outline-none focus:border-[#DC2626]"
-                      />
-                      <span className="absolute end-3 top-3 text-xs text-[#78716C] font-metric font-semibold">AED</span>
+                {/* 5. Pricing: Regular vs Surplus Rescue Price (Minimum 15 AED + Automatic 1.50 AED Customer Service Fee) */}
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block font-semibold text-[#1C1917] mb-1.5">
+                        {t.regularPriceAed} (سعر المنيو العادي) *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min={MIN_MERCHANT_ITEM_PRICE_AED}
+                          step="0.5"
+                          required
+                          value={formData.originalPrice}
+                          onChange={(e) => setFormData({ ...formData, originalPrice: parseFloat(e.target.value) || 0 })}
+                          className="w-full h-11 px-3 pe-12 bg-white border border-[#EAE4DC] rounded-xl text-sm font-metric text-[#1C1917] focus:outline-none focus:border-[#DC2626]"
+                        />
+                        <span className="absolute end-3 top-3 text-xs text-[#78716C] font-metric font-semibold">AED</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-[#1C1917] mb-1.5">
+                        {t.rescuePriceAed} ({isArabic ? `الحد الأدنى ${MIN_MERCHANT_ITEM_PRICE_AED} درهم` : `Min ${MIN_MERCHANT_ITEM_PRICE_AED} AED`}) *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min={MIN_MERCHANT_ITEM_PRICE_AED}
+                          step="0.5"
+                          required
+                          value={formData.discountedPrice}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            setFormData({ ...formData, discountedPrice: val });
+                            if (val >= MIN_MERCHANT_ITEM_PRICE_AED) {
+                              setPriceValidationError(null);
+                            }
+                          }}
+                          className={`w-full h-11 px-3 pe-12 bg-white border rounded-xl text-sm font-metric font-extrabold focus:outline-none ${
+                            formData.discountedPrice < MIN_MERCHANT_ITEM_PRICE_AED
+                              ? 'border-red-500 text-red-600 focus:border-red-600'
+                              : 'border-[#EAE4DC] text-[#DC2626] focus:border-[#DC2626]'
+                          }`}
+                        />
+                        <span className="absolute end-3 top-3 text-xs text-[#DC2626] font-metric font-bold">AED</span>
+                      </div>
+                      {formData.discountedPrice < MIN_MERCHANT_ITEM_PRICE_AED ? (
+                        <p className="text-[11px] text-red-600 font-bold mt-1 flex items-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>
+                            {isArabic
+                              ? `الحد الأدنى المسموح به للسعر هو ${MIN_MERCHANT_ITEM_PRICE_AED} درهم`
+                              : `Minimum allowed price is ${MIN_MERCHANT_ITEM_PRICE_AED} AED`}
+                          </span>
+                        </p>
+                      ) : formData.originalPrice > formData.discountedPrice ? (
+                        <p className="text-[11px] text-emerald-600 font-semibold mt-1">
+                          ✓ {isArabic ? 'نسبة الخصم للزبون: ' : 'Discount rate: '}
+                          {Math.round(((formData.originalPrice - formData.discountedPrice) / formData.originalPrice) * 100)}%
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block font-semibold text-[#1C1917] mb-1.5">
-                      {t.rescuePriceAed} (سعر فلاستر المخفض) *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="1"
-                        required
-                        value={formData.discountedPrice}
-                        onChange={(e) => setFormData({ ...formData, discountedPrice: parseInt(e.target.value) || 0 })}
-                        className="w-full h-11 px-3 pe-12 bg-white border border-[#EAE4DC] rounded-xl text-sm font-metric text-[#DC2626] font-extrabold focus:outline-none focus:border-[#DC2626]"
-                      />
-                      <span className="absolute end-3 top-3 text-xs text-[#DC2626] font-metric font-bold">AED</span>
+                  {priceValidationError && (
+                    <div className="p-2.5 rounded-xl bg-red-50 border border-red-300 text-red-800 text-xs font-bold flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                      <span>{priceValidationError}</span>
                     </div>
-                    {formData.originalPrice > formData.discountedPrice && (
-                      <p className="text-[11px] text-emerald-600 font-semibold mt-1">
-                        ✓ {isArabic ? 'نسبة الخصم للزبون: ' : 'Discount rate: '}
-                        {Math.round(((formData.originalPrice - formData.discountedPrice) / formData.originalPrice) * 100)}%
-                      </p>
-                    )}
+                  )}
+
+                  {/* Locked Automatic Price Preview (+1.50 AED blended silently into customer price) */}
+                  <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-300 space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between text-amber-950 font-bold">
+                      <span className="flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-700" />
+                        <span>
+                          {isArabic
+                            ? 'احتساب السعر التلقائي للزبون (مقفل وغير قابل للتعديل):'
+                            : 'Automatic Customer Price Breakdown (Locked):'}
+                        </span>
+                      </span>
+                      <span className="text-[10px] font-extrabold text-amber-900">
+                        {isArabic ? 'تلقائي ومقفل' : 'Locked'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 pt-1.5 border-t border-amber-200/80 font-metric text-[11px] tabular-nums">
+                      <div className="bg-white/80 rounded-lg p-2 border border-amber-200/70">
+                        <span className="text-[#78716C] block text-[10px] font-sans">
+                          {isArabic ? 'سعر الصنف (لك)' : 'Your Price'}
+                        </span>
+                        <strong className="text-[#1C1917] text-xs">
+                          {Math.max(0, formData.discountedPrice || 0).toFixed(2)} {t.currency}
+                        </strong>
+                      </div>
+                      <div className="bg-white/80 rounded-lg p-2 border border-amber-200/70">
+                        <span className="text-amber-800 block text-[10px] font-sans">
+                          {isArabic ? 'إضافة المنصة (ثابتة)' : 'Platform Markup'}
+                        </span>
+                        <strong className="text-amber-700 text-xs">
+                          +{CUSTOMER_SERVICE_FEE_AED.toFixed(2)} {t.currency}
+                        </strong>
+                      </div>
+                      <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-200">
+                        <span className="text-emerald-800 block text-[10px] font-sans">
+                          {isArabic ? 'السعر الظاهر للزبون' : 'Displayed to Customer'}
+                        </span>
+                        <strong className="text-emerald-900 text-xs font-extrabold">
+                          {(Math.max(0, formData.discountedPrice || 0) + CUSTOMER_SERVICE_FEE_AED).toFixed(2)} {t.currency}
+                        </strong>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-amber-900 leading-relaxed">
+                      {isArabic
+                        ? `تُضاف ${CUSTOMER_SERVICE_FEE_AED.toFixed(2)} درهم تلقائياً ضمن السعر النهائي المعروض للزبون دون إظهارها كرسوم منفصلة، ولا يمكن تعديلها.`
+                        : `${CUSTOMER_SERVICE_FEE_AED.toFixed(2)} AED is seamlessly included in the displayed customer price with no separate fee line shown.`}
+                    </p>
                   </div>
                 </div>
 

@@ -17,6 +17,8 @@ import { filsToAed } from '../config/platformConfig.ts';
 export type LoyaltyTransactionType =
   | 'earned_registration_bonus'
   | 'earned_daily_login'
+  | 'earned_social_follow'
+  | 'social_unfollow_deduction'
   | 'earned_purchase'
   | 'earned_review'
   | 'redeemed_checkout'
@@ -51,6 +53,7 @@ export interface CustomerWallet {
   totalExpiredPoints: number;
   welcomeBonusClaimed: boolean;
   completedOrdersCount: number;
+  claimedSocialPages?: string[];
   lastDailyLoginDate?: string;
   nextExpirationDate?: string;
   pointsSubjectToExpiry: number;
@@ -66,7 +69,7 @@ export interface LoyaltyConfig {
   reviewRewardPoints: number; // 10 points
   pointsPerAed: number; // 100 points = 1 AED (1 point = 1 fil)
   expirationDays: number; // 120 days (4 months)
-  minRedemptionPoints: number; // 100 points (1 AED)
+  minRedemptionPoints: number; // 1000 points (10 AED)
   maxRedemptionPointsPerOrder: number; // 5000 points (50 AED)
   maxClaimsPerIpPerHour: number; // Rate limit per IP/device
 }
@@ -79,7 +82,7 @@ export const loyaltyConfig: LoyaltyConfig = {
   reviewRewardPoints: 10,
   pointsPerAed: 100,
   expirationDays: 120,
-  minRedemptionPoints: 100,
+  minRedemptionPoints: 1000,
   maxRedemptionPointsPerOrder: 5000,
   maxClaimsPerIpPerHour: 5,
 };
@@ -165,6 +168,11 @@ async function persistWalletToFirestore(wallet: CustomerWallet, txn?: LoyaltyTra
         totalExpiredPoints: Math.round(wallet.totalExpiredPoints),
         welcomeBonusClaimed: Boolean(wallet.welcomeBonusClaimed),
         completedOrdersCount: Math.round(wallet.completedOrdersCount || 0),
+        claimedSocialPages: Array.isArray(wallet.claimedSocialPages)
+          ? wallet.claimedSocialPages.slice(0, 5)
+          : [],
+        ...(wallet.lastDailyLoginDate ? { lastDailyLoginDate: wallet.lastDailyLoginDate } : {}),
+        ...(wallet.nextExpirationDate ? { nextExpirationDate: wallet.nextExpirationDate } : {}),
         updatedAt: wallet.updatedAt,
       },
       { merge: true }
@@ -175,6 +183,35 @@ async function persistWalletToFirestore(wallet: CustomerWallet, txn?: LoyaltyTra
   } catch (err) {
     console.warn('[Loyalty] Deferred Firestore persist (local mode):', err instanceof Error ? err.message : err);
   }
+}
+
+/**
+ * Hydrates a customer's wallet from Firestore into server cache (prevents point loss after cold starts)
+ */
+export async function hydrateWalletFromFirestore(customerId: string): Promise<CustomerWallet> {
+  const wallet = getOrCreateWallet(customerId);
+  try {
+    const snap = await adminDb.collection('wallets').doc(wallet.customerId).get();
+    if (snap && snap.exists) {
+      const data = snap.data() || {};
+      if (typeof data.availablePoints === 'number') wallet.availablePoints = data.availablePoints;
+      if (typeof data.totalEarnedPoints === 'number') wallet.totalEarnedPoints = data.totalEarnedPoints;
+      if (typeof data.totalRedeemedPoints === 'number') wallet.totalRedeemedPoints = data.totalRedeemedPoints;
+      if (typeof data.totalExpiredPoints === 'number') wallet.totalExpiredPoints = data.totalExpiredPoints;
+      if (typeof data.welcomeBonusClaimed === 'boolean') wallet.welcomeBonusClaimed = data.welcomeBonusClaimed;
+      if (typeof data.completedOrdersCount === 'number') wallet.completedOrdersCount = data.completedOrdersCount;
+      if (Array.isArray(data.claimedSocialPages)) wallet.claimedSocialPages = data.claimedSocialPages;
+      if (typeof data.lastDailyLoginDate === 'string') wallet.lastDailyLoginDate = data.lastDailyLoginDate;
+      if (typeof data.nextExpirationDate === 'string') wallet.nextExpirationDate = data.nextExpirationDate;
+      if (typeof data.updatedAt === 'string') wallet.updatedAt = data.updatedAt;
+      wallet.equivalentFils = Math.round(wallet.availablePoints);
+      wallet.equivalentAed = filsToAed(wallet.equivalentFils);
+      walletsCache.set(wallet.customerId, wallet);
+    }
+  } catch {
+    // Graceful fallback when Firestore Admin SDK credentials are unavailable locally
+  }
+  return wallet;
 }
 
 /**
@@ -200,6 +237,7 @@ export function getOrCreateWallet(customerId: string): CustomerWallet {
       totalExpiredPoints: 0,
       welcomeBonusClaimed: false,
       completedOrdersCount: 0,
+      claimedSocialPages: [],
       pointsSubjectToExpiry: 0,
       nextExpirationDate: calculateExpiryDate(new Date()),
       daysUntilExpiry: loyaltyConfig.expirationDays,
@@ -359,7 +397,7 @@ export async function claimNewUserWelcomeBonus(
     // Attempt Firestore Atomic Transaction first
     try {
       const walletRef = adminDb.collection('wallets').doc(normalizedPhone);
-      const txResult = await adminDb.runTransaction(async (transaction) => {
+      const txResult = await adminDb.runTransaction(async (transaction: any) => {
         const snap = await transaction.get(walletRef);
         const wallet = getOrCreateWallet(normalizedPhone);
         if (snap.exists) {
@@ -540,6 +578,136 @@ export function claimDailyLoginReward(customerId: string): {
     wallet,
     alreadyClaimedToday: false,
     message: '🎉 تم إضافة نقطة تسجيل الدخول اليومية إلى محفظتك بنجاح!',
+  };
+}
+
+const ALLOWED_SOCIAL_FOLLOW_PAGES = new Set(['instagram', 'tiktok', 'snapchat', 'facebook', 'x']);
+const SOCIAL_FOLLOW_POINTS = 5;
+
+/**
+ * Social Media Follow Reward: 5 points per official Flaster platform (5 platforms total = max 25 points)
+ */
+export function claimSocialFollowReward(
+  customerId: string,
+  pageId: string,
+  handle?: string
+): {
+  success: boolean;
+  pointsAwarded: number;
+  alreadyClaimed: boolean;
+  claimedSocialPages: string[];
+  wallet: CustomerWallet;
+  message: string;
+} {
+  const normalizedPage = String(pageId || '').trim().toLowerCase();
+  const cleanHandle = typeof handle === 'string' ? handle.trim().slice(0, 64) : '';
+  const wallet = getOrCreateWallet(customerId);
+  const currentClaimed = Array.isArray(wallet.claimedSocialPages) ? wallet.claimedSocialPages : [];
+
+  if (!ALLOWED_SOCIAL_FOLLOW_PAGES.has(normalizedPage)) {
+    return {
+      success: false,
+      pointsAwarded: 0,
+      alreadyClaimed: false,
+      claimedSocialPages: currentClaimed,
+      wallet,
+      message: 'مكافأة النقاط تشمل منصات فلاستر الخمس الرسمية المعتمدة فقط.',
+    };
+  }
+
+  if (currentClaimed.includes(normalizedPage)) {
+    return {
+      success: false,
+      pointsAwarded: 0,
+      alreadyClaimed: true,
+      claimedSocialPages: currentClaimed,
+      wallet,
+      message: 'لقد حصلت مسبقاً على نقاط متابعة هذه المنصة (5 نقاط).',
+    };
+  }
+
+  const expiryDate = calculateExpiryDate();
+  const nowIso = new Date().toISOString();
+  const nextClaimed = [...currentClaimed, normalizedPage];
+
+  wallet.claimedSocialPages = nextClaimed;
+  wallet.availablePoints += SOCIAL_FOLLOW_POINTS;
+  wallet.totalEarnedPoints += SOCIAL_FOLLOW_POINTS;
+  wallet.pointsSubjectToExpiry += SOCIAL_FOLLOW_POINTS;
+  wallet.equivalentFils = Math.round(wallet.availablePoints);
+  wallet.equivalentAed = filsToAed(wallet.equivalentFils);
+  wallet.updatedAt = nowIso;
+
+  const txn: LoyaltyTransaction = {
+    id: `TXN-LOY-SOC-${normalizedPage.toUpperCase()}-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+    customerId: wallet.customerId,
+    type: 'earned_social_follow',
+    points: SOCIAL_FOLLOW_POINTS,
+    equivalentFils: SOCIAL_FOLLOW_POINTS,
+    equivalentAed: filsToAed(SOCIAL_FOLLOW_POINTS),
+    note: cleanHandle
+      ? `مكافأة متابعة ${normalizedPage} (${cleanHandle}) — +${SOCIAL_FOLLOW_POINTS} نقاط`
+      : `مكافأة متابعة منصة فلاستر (${normalizedPage}) — +${SOCIAL_FOLLOW_POINTS} نقاط`,
+    status: 'COMPLETED',
+    createdAt: nowIso,
+    expiryDate,
+  };
+  transactionsCache.push(txn);
+  void persistWalletToFirestore(wallet, txn);
+
+  return {
+    success: true,
+    pointsAwarded: SOCIAL_FOLLOW_POINTS,
+    alreadyClaimed: false,
+    claimedSocialPages: nextClaimed,
+    wallet,
+    message: `🎉 شكراً لمتابعتك! تمت إضافة ${SOCIAL_FOLLOW_POINTS} نقاط إلى محفظتك (${nextClaimed.length}/5 منصات).`,
+  };
+}
+
+/**
+ * Admin Revocation: Deducts 5 points if customer unfollowed a platform
+ */
+export function revokeSocialFollowReward(
+  customerId: string,
+  pageId: string
+): {
+  success: boolean;
+  pointsDeducted: number;
+  wallet: CustomerWallet;
+  message: string;
+} {
+  const normalizedPage = String(pageId || '').trim().toLowerCase();
+  const wallet = getOrCreateWallet(customerId);
+  const currentClaimed = Array.isArray(wallet.claimedSocialPages) ? wallet.claimedSocialPages : [];
+  const pointsDeducted = Math.min(SOCIAL_FOLLOW_POINTS, wallet.availablePoints);
+  const nowIso = new Date().toISOString();
+
+  wallet.claimedSocialPages = currentClaimed.filter((p) => p !== normalizedPage);
+  wallet.availablePoints = Math.max(0, wallet.availablePoints - SOCIAL_FOLLOW_POINTS);
+  wallet.equivalentFils = Math.round(wallet.availablePoints);
+  wallet.equivalentAed = filsToAed(wallet.equivalentFils);
+  wallet.updatedAt = nowIso;
+
+  const txn: LoyaltyTransaction = {
+    id: `TXN-LOY-UNFOLLOW-${normalizedPage.toUpperCase()}-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+    customerId: wallet.customerId,
+    type: 'social_unfollow_deduction',
+    points: -SOCIAL_FOLLOW_POINTS,
+    equivalentFils: -SOCIAL_FOLLOW_POINTS,
+    equivalentAed: -filsToAed(SOCIAL_FOLLOW_POINTS),
+    note: `خصم ${SOCIAL_FOLLOW_POINTS} نقاط بسبب إلغاء متابعة منصة (${normalizedPage})`,
+    status: 'COMPLETED',
+    createdAt: nowIso,
+  };
+  transactionsCache.push(txn);
+  void persistWalletToFirestore(wallet, txn);
+
+  return {
+    success: true,
+    pointsDeducted,
+    wallet,
+    message: `تم خصم ${SOCIAL_FOLLOW_POINTS} نقاط بسبب إلغاء المتابعة على (${normalizedPage}).`,
   };
 }
 

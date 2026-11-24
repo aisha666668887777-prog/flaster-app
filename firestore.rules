@@ -65,14 +65,65 @@ service cloud.firestore {
 
     function isValidWallet(data) {
       return data.keys().hasAll(['customerId', 'availablePoints', 'welcomeBonusClaimed', 'updatedAt']) &&
-        data.keys().hasOnly(['customerId', 'availablePoints', 'totalEarnedPoints', 'totalRedeemedPoints', 'totalExpiredPoints', 'welcomeBonusClaimed', 'completedOrdersCount', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'customerId', 'customerName', 'availablePoints', 'totalEarnedPoints',
+          'totalRedeemedPoints', 'totalExpiredPoints', 'welcomeBonusClaimed',
+          'completedOrdersCount', 'claimedSocialPages', 'lastDailyLoginDate',
+          'nextExpirationDate', 'updatedAt'
+        ]) &&
         data.customerId is string && data.customerId.size() >= 1 && data.customerId.size() <= 128 &&
-        data.availablePoints is int && data.availablePoints >= 0 &&
+        (!('customerName' in data) || (data.customerName is string && data.customerName.size() <= 120)) &&
+        data.availablePoints is int && data.availablePoints >= 0 && data.availablePoints <= 1000000 &&
         (!('totalEarnedPoints' in data) || (data.totalEarnedPoints is int && data.totalEarnedPoints >= 0)) &&
         (!('totalRedeemedPoints' in data) || (data.totalRedeemedPoints is int && data.totalRedeemedPoints >= 0)) &&
         (!('totalExpiredPoints' in data) || (data.totalExpiredPoints is int && data.totalExpiredPoints >= 0)) &&
         data.welcomeBonusClaimed is bool &&
         (!('completedOrdersCount' in data) || (data.completedOrdersCount is int && data.completedOrdersCount >= 0)) &&
+        (!('claimedSocialPages' in data) || (
+          data.claimedSocialPages is list &&
+          data.claimedSocialPages.size() <= 5 &&
+          data.claimedSocialPages.hasOnly(['instagram', 'tiktok', 'snapchat', 'facebook', 'x'])
+        )) &&
+        (!('lastDailyLoginDate' in data) || (data.lastDailyLoginDate is string && data.lastDailyLoginDate.size() <= 32)) &&
+        (!('nextExpirationDate' in data) || (data.nextExpirationDate is string && data.nextExpirationDate.size() <= 64)) &&
+        data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    function isValidLoyaltyTransaction(data) {
+      return data.keys().hasAll(['id', 'customerId', 'type', 'points', 'status', 'createdAt']) &&
+        data.keys().hasOnly([
+          'id', 'customerId', 'type', 'points', 'equivalentFils', 'equivalentAed',
+          'note', 'relatedOrderId', 'relatedReviewId', 'status', 'createdAt', 'expiryDate'
+        ]) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 &&
+        data.customerId is string && data.customerId.size() >= 1 && data.customerId.size() <= 128 &&
+        data.type is string && data.type.size() >= 1 && data.type.size() <= 64 &&
+        data.points is int && data.points >= -5000 && data.points <= 500 &&
+        (!('equivalentFils' in data) || data.equivalentFils is int) &&
+        (!('equivalentAed' in data) || data.equivalentAed is number) &&
+        (!('note' in data) || (data.note is string && data.note.size() <= 300)) &&
+        (!('relatedOrderId' in data) || (data.relatedOrderId is string && data.relatedOrderId.size() <= 128)) &&
+        (!('relatedReviewId' in data) || (data.relatedReviewId is string && data.relatedReviewId.size() <= 128)) &&
+        data.status in ['COMPLETED', 'CANCELLED'] &&
+        data.createdAt is string && data.createdAt.size() <= 64 &&
+        (!('expiryDate' in data) || (data.expiryDate is string && data.expiryDate.size() <= 64));
+    }
+
+    function isValidSocialFollowClaim(data) {
+      return data.keys().hasAll(['id', 'customerId', 'pageId', 'handle', 'pointsAwarded', 'status', 'claimedAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'id', 'customerId', 'customerName', 'pageId', 'handle',
+          'pointsAwarded', 'status', 'claimedAt', 'revokedAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 &&
+        data.customerId is string && data.customerId.size() >= 1 && data.customerId.size() <= 128 &&
+        (!('customerName' in data) || (data.customerName is string && data.customerName.size() <= 120)) &&
+        data.pageId in ['instagram', 'tiktok', 'snapchat', 'facebook', 'x'] &&
+        data.handle is string && data.handle.size() >= 1 && data.handle.size() <= 64 &&
+        data.pointsAwarded is int && data.pointsAwarded == 5 &&
+        data.status in ['active', 'revoked'] &&
+        data.claimedAt is string && data.claimedAt.size() <= 64 &&
+        (!('revokedAt' in data) || (data.revokedAt is string && data.revokedAt.size() <= 64)) &&
         data.updatedAt is string && data.updatedAt.size() <= 64;
     }
 
@@ -80,7 +131,7 @@ service cloud.firestore {
       return data.keys().hasAll(['id', 'customerId', 'merchantId', 'totalFils', 'status', 'fulfillmentType', 'createdAt', 'updatedAt']) &&
         data.keys().hasOnly([
           'id', 'code', 'invoiceNumber', 'customerId', 'customerName', 'customerPhone', 'deliveryAddress',
-          'merchantId', 'items', 'itemSnapshot', 'subtotalFils', 'deliveryFeeFils',
+          'merchantId', 'items', 'itemSnapshot', 'subtotalFils', 'serviceFeeFils', 'deliveryFeeFils',
           'platformCommissionFils', 'merchantEarningsFils', 'pointsDiscountFils', 'pointsRedeemed',
           'platformLoyaltyExpenseFils', 'vatFils', 'totalFils', 'status', 'workflowStatus',
           'fulfillmentType', 'paymentMethod', 'paymentStatus', 'paymentTransactionId', 'paymentGateway',
@@ -92,6 +143,7 @@ service cloud.firestore {
         data.merchantId is string && data.merchantId.size() >= 1 && data.merchantId.size() <= 128 &&
         data.totalFils is int && data.totalFils >= 0 &&
         (!('subtotalFils' in data) || (data.subtotalFils is int && data.subtotalFils >= 0)) &&
+        (!('serviceFeeFils' in data) || (data.serviceFeeFils is int && data.serviceFeeFils >= 0)) &&
         (!('deliveryFeeFils' in data) || (data.deliveryFeeFils is int && data.deliveryFeeFils == 0)) &&
         (!('pointsDiscountFils' in data) || (data.pointsDiscountFils is int && data.pointsDiscountFils >= 0)) &&
         (!('pointsRedeemed' in data) || (data.pointsRedeemed is int && data.pointsRedeemed >= 0)) &&
@@ -118,8 +170,8 @@ service cloud.firestore {
         data.merchantId is string && data.merchantId.size() >= 1 && data.merchantId.size() <= 128 &&
         data.titleEn is string && data.titleEn.size() >= 1 && data.titleEn.size() <= 200 &&
         data.titleAr is string && data.titleAr.size() >= 1 && data.titleAr.size() <= 200 &&
-        data.originalPriceFils is int && data.originalPriceFils >= 0 &&
-        data.discountedPriceFils is int && data.discountedPriceFils >= 0 &&
+        data.originalPriceFils is int && data.originalPriceFils >= 1500 &&
+        data.discountedPriceFils is int && data.discountedPriceFils >= 1500 &&
         data.discountedPriceFils <= data.originalPriceFils &&
         data.stockRemaining is int && data.stockRemaining >= 0 &&
         (!('expiryTime' in data) || (data.expiryTime is string && data.expiryTime.size() <= 64)) &&
@@ -133,7 +185,7 @@ service cloud.firestore {
     function isValidMerchant(data) {
       return data.keys().hasAll(['id', 'name', 'nameAr', 'commissionPercent', 'isVerified', 'updatedAt']) &&
         data.keys().hasOnly([
-          'id', 'name', 'nameAr', 'category', 'neighborhood', 'neighborhoodAr',
+          'id', 'username', 'disabled', 'name', 'nameAr', 'category', 'neighborhood', 'neighborhoodAr',
           'commissionPercent', 'isVerified', 'totalSalesFils', 'totalSalesAed',
           'activeListingsCount', 'rating', 'phone', 'iban', 'lat', 'lng',
           'address', 'addressAr', 'avatar', 'updatedAt'
@@ -201,20 +253,49 @@ service cloud.firestore {
       allow delete: if isValidId(userId) && isAdmin();
     }
 
-    // Wallets: Users can only read their own wallet; strictly only server Admin SDK or Admins can mutate points
+    // Wallets: Users can read and safely persist their own bounded wallet updates; Admins manage all
     match /wallets/{userId} {
       allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
       allow list: if isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin());
-      allow create: if isValidId(userId) && isAdmin() && isValidWallet(incoming());
-      allow update: if isValidId(userId) && isValidWallet(incoming()) && isAdmin();
+      allow create: if isValidId(userId) && isValidWallet(incoming()) && (
+        isAdmin() ||
+        (isOwner(userId) &&
+         incoming().customerId == request.auth.uid &&
+         incoming().availablePoints <= 125)
+      );
+      allow update: if isValidId(userId) && isValidWallet(incoming()) && (
+        isAdmin() ||
+        (isOwner(userId) &&
+         incoming().customerId == existing().customerId &&
+         incoming().availablePoints >= 0 &&
+         incoming().availablePoints <= existing().availablePoints + 25)
+      );
       allow delete: if isValidId(userId) && isAdmin();
     }
 
-    // Loyalty Transactions: Read own or Admin; write strictly server Admin SDK / Admin only
+    // Loyalty Transactions: Read & append own bounded ledger entries; Admin manages all
     match /loyalty_transactions/{txnId} {
       allow get: if isValidId(txnId) && isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin());
-      allow write: if isAdmin();
+      allow create: if isValidId(txnId) && isValidLoyaltyTransaction(incoming()) && (
+        isAdmin() ||
+        (isSignedIn() && incoming().customerId == request.auth.uid && incoming().points <= 90)
+      );
+      allow update, delete: if isValidId(txnId) && isAdmin();
+    }
+
+    // Social Follow Verification Claims: Customers submit @handle per platform; Admin audits & revokes on unfollow
+    match /social_follow_claims/{claimId} {
+      allow get: if isValidId(claimId) && isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(claimId) && isValidSocialFollowClaim(incoming()) && (
+        isAdmin() ||
+        (isSignedIn() &&
+         incoming().customerId == request.auth.uid &&
+         incoming().status == 'active')
+      );
+      allow update: if isValidId(claimId) && isValidSocialFollowClaim(incoming()) && isAdmin();
+      allow delete: if isValidId(claimId) && isAdmin();
     }
 
     // Orders:
@@ -238,6 +319,8 @@ service cloud.firestore {
         isAdmin() ||
         (incoming().customerId == request.auth.uid &&
          incoming().status == 'placed' &&
+         incoming().fulfillmentType == 'pickup' &&
+         (!('serviceFeeFils' in incoming()) || (incoming().serviceFeeFils is int && incoming().serviceFeeFils >= 150 && incoming().serviceFeeFils % 150 == 0)) &&
          (!('refundStatus' in incoming()) || incoming().refundStatus == 'none') &&
          (!('pointsRedeemed' in incoming()) || incoming().pointsRedeemed == 0) &&
          (!('pointsDiscountFils' in incoming()) || incoming().pointsDiscountFils == 0))

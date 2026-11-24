@@ -2,6 +2,7 @@ import React from 'react';
 import { Clock, CheckCircle2, Star, ShoppingCart, MapPin, Heart } from 'lucide-react';
 import { SurplusItem, Language } from '../types';
 import { translations } from '../translations';
+import { getCustomerItemPriceAed } from '../config/platformConfig';
 
 interface SurplusCardProps {
   item: SurplusItem;
@@ -29,7 +30,8 @@ export const SurplusCard: React.FC<SurplusCardProps> = ({
   const pickupDay = item.pickupDate === 'today' ? t.today : t.tomorrow;
 
   const isLowStock = item.stockRemaining <= 2;
-  const savedAmount = Math.max(0, item.originalPrice - item.discountedPrice);
+  const customerPrice = getCustomerItemPriceAed(item.discountedPrice);
+  const savedAmount = Math.max(0, Number((item.originalPrice - customerPrice).toFixed(2)));
 
   return (
     <article
@@ -152,8 +154,8 @@ export const SurplusCard: React.FC<SurplusCardProps> = ({
               {item.originalPrice} {t.currency}
             </span>
             <div className="flex items-baseline gap-1">
-              <span className="font-headline font-black text-xl text-[#059669]">
-                {item.discountedPrice}
+              <span className="font-headline font-black text-xl text-[#059669] tabular-nums">
+                {customerPrice.toFixed(2)}
               </span>
               <span className="font-metric text-xs font-bold text-[#DC2626]">
                 {t.currency}

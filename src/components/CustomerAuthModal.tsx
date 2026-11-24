@@ -103,7 +103,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
             isDefault: true,
           },
         ],
-        loyaltyPoints: initialProfile?.loyaltyPoints || 0,
+        loyaltyPoints: initialProfile?.loyaltyPoints || 90,
         welcomeBonusClaimed: false,
         completedOrdersCount: initialProfile?.completedOrdersCount || 0,
         joinedAt: initialProfile?.joinedAt || new Date().toISOString(),
@@ -307,8 +307,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
           isDefault: true,
         },
       ],
-      // Strictly 0 points at signup; 500 welcome points awarded after first completed order
-      loyaltyPoints: (initialProfile?.loyaltyPoints || 0) + pointsAwardedNow,
+      // 90 welcome points awarded upon signup
+      loyaltyPoints: (initialProfile?.loyaltyPoints || 90) + pointsAwardedNow,
       welcomeBonusClaimed: false,
       completedOrdersCount: initialProfile?.completedOrdersCount || 0,
       joinedAt: initialProfile?.joinedAt || nowIso,
@@ -384,8 +384,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
             <span>
               {isArabic
-                ? 'مكافأة 500 نقطة (5 دراهم) تُضاف بعد أول طلب مكتمل!'
-                : '500 Welcome Points (AED 5) unlocked after your 1st completed order!'}
+                ? 'أهلاً بك في فلاستر! ستحصل على نقاط ترحيبية تُحفظ تلقائياً في حسابك'
+                : 'Welcome to Flaster! Receive welcome loyalty points saved to your account'}
             </span>
           </div>
         </div>
@@ -615,8 +615,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 </span>
                 <p className="text-[11px] text-emerald-800">
                   {isArabic
-                    ? 'أكمل ملفك الشخصي. ستحصل تلقائياً على 500 نقطة ترحيبية (5 دراهم) فور إتمام استلام طلبك الأول!'
-                    : 'Complete your profile. You will automatically receive 500 welcome points (5 AED) right after completing your first order!'}
+                    ? 'أكمل ملفك الشخصي لتفعيل حسابك والبدء في حفظ وجمع نقاط المكافآت!'
+                    : 'Complete your profile to activate your account and start saving reward points!'}
                 </p>
               </div>
 
@@ -689,12 +689,12 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               </h4>
               <div className="p-4 bg-gradient-to-r from-amber-50 to-amber-100 rounded-2xl border border-amber-300 text-amber-950 font-metric space-y-1">
                 <span className="text-lg font-black text-amber-700 block">
-                  {isArabic ? '🎁 هدية 500 نقطة جاهزة للتفعيل' : '🎁 500 Welcome Points Ready'}
+                  {isArabic ? '🎁 أهلاً بك! حصلت على نقاط ترحيبية' : '🎁 Welcome! You Earned Welcome Points'}
                 </span>
                 <span className="text-[11px] text-amber-800 block">
                   {isArabic
-                    ? 'ستُضاف 500 نقطة ترحيبية (بقيمة 5 دراهم) تلقائياً إلى محفظتك فور إتمام استلام طلبك الأول!'
-                    : '500 welcome points (worth AED 5.00) will be credited automatically right after your first completed order!'}
+                    ? 'تم تفعيل محفظة نقاطك وحفظها تلقائياً في حسابك. يمكنك متابعة رصيدك وجمع المزيد من «نقاطي»!'
+                    : 'Your loyalty wallet is active and saved to your account. Track and earn more inside "My Points"!'}
                 </span>
               </div>
             </div>
