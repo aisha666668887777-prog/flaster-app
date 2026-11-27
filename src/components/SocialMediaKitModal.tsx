@@ -13,7 +13,7 @@ import {
 import { Language } from '../types';
 import socialPostImg from '../assets/images/flaster_social_post_1794327885263.jpg';
 import storyPosterImg from '../assets/images/flaster_story_poster_1794327885702.jpg';
-import brandLogoImg from '../assets/images/flaster_brand_logo_1794321576013.jpg';
+import brandLogoImg from '../assets/images/flaster_new_logo_1795639863963.jpg';
 
 interface SocialMediaKitModalProps {
   isOpen: boolean;
@@ -53,9 +53,9 @@ export const SocialMediaKitModal: React.FC<SocialMediaKitModalProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200"
       dir={isArabic ? 'rtl' : 'ltr'}
     >
-      <div className="bg-[#FAF8F5] border-2 border-[#F59E0B]/40 rounded-3xl max-w-4xl w-full max-h-[92vh] overflow-y-auto shadow-2xl">
+      <div className="bg-[#FAF8F2] border-2 border-[#F4C430]/70 rounded-3xl max-w-4xl w-full max-h-[92vh] overflow-y-auto shadow-2xl">
         {/* Header */}
-        <div className="sticky top-0 z-20 bg-gradient-to-r from-[#DC2626] via-[#EA580C] to-[#F59E0B] text-white px-5 py-4 flex items-center justify-between rounded-t-3xl shadow-md">
+        <div className="sticky top-0 z-20 bg-gradient-to-r from-[#9E1B28] via-[#78121D] to-[#4F6345] text-white px-5 py-4 flex items-center justify-between rounded-t-3xl shadow-md">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
               <Instagram className="w-5 h-5 text-white" />

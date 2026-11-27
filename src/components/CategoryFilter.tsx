@@ -118,11 +118,11 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
               onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
               className={`flex items-center justify-between gap-2 px-4 h-11 rounded-xl text-xs font-extrabold transition-all border cursor-pointer shrink-0 ${
                 selectedLocation && selectedLocation !== 'region-all'
-                  ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
-                  : 'bg-[#FFFDF9] text-[#1C1917] border-[#EAE4DC] hover:border-amber-600 hover:bg-amber-50/40'
+                  ? 'bg-[#6E8462] text-white border-[#6E8462] shadow-sm'
+                  : 'bg-[#FFFDF9] text-[#1C1917] border-[#E8E3D8] hover:border-[#6E8462] hover:bg-[#EFF4EC]/60'
               }`}
             >
-              <MapPin className={`w-4 h-4 shrink-0 ${selectedLocation && selectedLocation !== 'region-all' ? 'text-white' : 'text-amber-600'}`} />
+              <MapPin className={`w-4 h-4 shrink-0 ${selectedLocation && selectedLocation !== 'region-all' ? 'text-[#F4C430]' : 'text-[#6E8462]'}`} />
               <span>
                 {isArabic ? 'المنطقة: ' : 'Region: '}
                 <strong className="font-extrabold truncate max-w-[120px] inline-block align-bottom">
@@ -137,9 +137,9 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
             </button>
 
             {regionDropdownOpen && (
-              <div className="absolute start-0 mt-2 w-72 rounded-2xl bg-[#FFFDF9] border-2 border-amber-300 shadow-2xl py-2 z-[70] max-h-80 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
-                <div className="px-3.5 py-2 text-[11px] font-extrabold text-[#78716C] border-b border-[#EAE4DC]/70 flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-[#DC2626]" />
+              <div className="absolute start-0 mt-2 w-72 rounded-2xl bg-[#FFFDF9] border-2 border-[#6E8462]/40 shadow-2xl py-2 z-[70] max-h-80 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-3.5 py-2 text-[11px] font-extrabold text-[#78716C] border-b border-[#E8E3D8]/70 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-[#9E1B28]" />
                   <span>{isArabic ? 'اختر منطقة التوصيل في رأس الخيمة:' : 'Select RAK Delivery Region:'}</span>
                 </div>
                 <div className="py-1">
@@ -155,12 +155,12 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
                         }}
                         className={`w-full text-start px-4 py-2.5 text-xs flex items-center justify-between transition-colors cursor-pointer ${
                           isSelected
-                            ? 'bg-amber-100 text-[#DC2626] font-extrabold'
-                            : 'text-[#1C1917] font-semibold hover:bg-[#FAF7F2]'
+                            ? 'bg-[#FEF9E1] text-[#9E1B28] font-extrabold'
+                            : 'text-[#1C1917] font-semibold hover:bg-[#FAF8F2]'
                         }`}
                       >
                         <span className="truncate">{isArabic ? reg.nameAr : reg.name}</span>
-                        {isSelected && <Check className="w-4 h-4 text-[#059669] shrink-0" />}
+                        {isSelected && <Check className="w-4 h-4 text-[#6E8462] shrink-0" />}
                       </button>
                     );
                   })}
@@ -169,16 +169,14 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
             )}
           </div>
 
-
-
           {/* Restaurant Map Button («خريطة المطاعم») */}
           <button
             type="button"
             onClick={onToggleMapView}
             className={`flex items-center justify-center gap-1.5 px-3.5 h-11 rounded-xl text-xs font-bold transition-all border shrink-0 cursor-pointer ${
               isMapView
-                ? 'bg-gradient-to-r from-[#059669] to-emerald-600 text-white border-emerald-500 shadow-md'
-                : 'bg-emerald-50/70 text-emerald-950 border-emerald-300 hover:bg-emerald-100'
+                ? 'bg-[#6E8462] text-white border-[#4F6345] shadow-md'
+                : 'bg-[#EFF4EC] text-[#3F5136] border-[#6E8462]/40 hover:bg-[#E1ECDB]'
             }`}
           >
             <span>{isMapView ? '📋' : '🗺️'}</span>
@@ -191,8 +189,8 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
             onClick={onToggleFavoritesOnly}
             className={`flex items-center justify-center gap-1.5 px-3.5 h-11 rounded-xl text-xs font-bold transition-all border shrink-0 cursor-pointer ${
               showFavoritesOnly
-                ? 'bg-[#DC2626] text-white border-[#DC2626] shadow-xs'
-                : 'bg-red-50/70 text-[#DC2626] border-red-200 hover:bg-red-100'
+                ? 'bg-[#9E1B28] text-white border-[#9E1B28] shadow-xs'
+                : 'bg-[#FDF2F3] text-[#9E1B28] border-[#9E1B28]/25 hover:bg-[#FCE5E7]'
             }`}
           >
             <span>{t.favoritesOnly}</span>
@@ -205,11 +203,11 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
             onClick={onToggleExpiringOnly}
             className={`flex items-center justify-center gap-2 px-3.5 h-11 rounded-xl text-xs font-bold transition-all border shrink-0 cursor-pointer ${
               filterExpiringOnly
-                ? 'bg-amber-400 text-stone-950 border-amber-500 shadow-xs'
-                : 'bg-amber-50/80 text-amber-950 border-amber-300 hover:bg-amber-100'
+                ? 'bg-[#F4C430] text-[#2D2200] border-[#D4A017] shadow-xs'
+                : 'bg-[#FEF9E1] text-[#3B2800] border-[#F4C430]/70 hover:bg-[#FDF0B8]'
             }`}
           >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-[#DC2626]" />
+            <SlidersHorizontal className="w-3.5 h-3.5 text-[#9E1B28]" />
             <span>{t.expiringSoonBtn}</span>
           </button>
         </div>

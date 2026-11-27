@@ -170,8 +170,8 @@ service cloud.firestore {
         data.merchantId is string && data.merchantId.size() >= 1 && data.merchantId.size() <= 128 &&
         data.titleEn is string && data.titleEn.size() >= 1 && data.titleEn.size() <= 200 &&
         data.titleAr is string && data.titleAr.size() >= 1 && data.titleAr.size() <= 200 &&
-        data.originalPriceFils is int && data.originalPriceFils >= 1500 &&
-        data.discountedPriceFils is int && data.discountedPriceFils >= 1500 &&
+        data.originalPriceFils is int && data.originalPriceFils >= 1 &&
+        data.discountedPriceFils is int && data.discountedPriceFils >= 1 &&
         data.discountedPriceFils <= data.originalPriceFils &&
         data.stockRemaining is int && data.stockRemaining >= 0 &&
         (!('expiryTime' in data) || (data.expiryTime is string && data.expiryTime.size() <= 64)) &&

@@ -675,8 +675,8 @@ export const AdminFoundersDashboard: React.FC<AdminFoundersDashboardProps> = ({
     if (createInitialListing && (!Number.isFinite(newBoxDiscPrice) || newBoxDiscPrice < MIN_MERCHANT_ITEM_PRICE_AED)) {
       setCommissionError(
         isArabic
-          ? `الحد الأدنى لسعر بيع الصنف هو ${MIN_MERCHANT_ITEM_PRICE_AED} درهماً إماراتياً.`
-          : `Minimum selling price for a food item is ${MIN_MERCHANT_ITEM_PRICE_AED} AED.`
+          ? 'يرجى إدخال سعر بيع صحيح أكبر من 0 درهم.'
+          : 'Please enter a valid selling price greater than 0 AED.'
       );
       return;
     }
@@ -1962,8 +1962,8 @@ export const AdminFoundersDashboard: React.FC<AdminFoundersDashboardProps> = ({
                           </label>
                           <input
                             type="number"
-                            min={MIN_MERCHANT_ITEM_PRICE_AED}
-                            step="0.5"
+                            min="0.01"
+                            step="any"
                             value={newBoxOrigPrice}
                             onChange={(e) => setNewBoxOrigPrice(Number(e.target.value))}
                             className="w-full h-8 px-2 bg-[#FAF7F2] border border-[#EAE4DC] rounded-lg text-xs font-metric font-bold"
@@ -1971,12 +1971,12 @@ export const AdminFoundersDashboard: React.FC<AdminFoundersDashboardProps> = ({
                         </div>
                         <div>
                           <label className="block text-[10px] font-bold text-stone-600 mb-0.5">
-                            {isArabic ? `سعر التاجر (أدنى ${MIN_MERCHANT_ITEM_PRICE_AED} د.إ)` : `Price (Min ${MIN_MERCHANT_ITEM_PRICE_AED})`}
+                            {isArabic ? 'سعر التاجر (درهم)' : 'Merchant Price (AED)'}
                           </label>
                           <input
                             type="number"
-                            min={MIN_MERCHANT_ITEM_PRICE_AED}
-                            step="0.5"
+                            min="0.01"
+                            step="any"
                             value={newBoxDiscPrice}
                             onChange={(e) => setNewBoxDiscPrice(Number(e.target.value))}
                             className={`w-full h-8 px-2 bg-[#FAF7F2] border rounded-lg text-xs font-metric font-bold ${

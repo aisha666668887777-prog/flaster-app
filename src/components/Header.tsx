@@ -30,7 +30,7 @@ import { translations, LANGUAGE_OPTIONS } from '../translations';
 import { ADMIN_EMAIL_ALLOWLIST } from '../config/platformConfig';
 import { useAuth } from '../context/AuthContext';
 import { PWAInstallButton, OfflineIndicator } from './PWAInstallButton';
-import flasterLogoImg from '../assets/images/flaster_brand_logo_1794321576013.jpg';
+import flasterLogoImg from '../assets/images/flaster_new_icon_1795639863426.jpg';
 
 interface HeaderProps {
   lang: Language;
@@ -194,7 +194,7 @@ export const Header: React.FC<HeaderProps> = ({
           pointerEvents: 'auto',
           boxSizing: 'border-box',
         }}
-        className="pwa-safe-header sticky top-0 z-[100] bg-[#FFFDF9] border-b border-[#EAE4DC] shadow-2xs transition-all"
+        className="pwa-safe-header sticky top-0 z-[100] bg-[#FFFDF9] border-b-2 border-[#F4C430]/70 shadow-2xs transition-all"
       >
         <div
           style={{ pointerEvents: 'auto' }}
@@ -235,7 +235,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className="pwa-touch-btn flex items-center gap-2 sm:gap-3 text-start group focus:outline-none cursor-pointer min-w-0 select-none"
                 title="Flaster"
               >
-                <div className="relative w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl overflow-hidden bg-white shadow-sm border border-[#EAE4DC] group-hover:scale-105 transition-all shrink-0 pointer-events-none">
+                <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl overflow-hidden bg-[#FFFDF7] shadow-sm border border-[#E8E3D8] group-hover:scale-105 transition-all shrink-0 pointer-events-none">
                   <img
                     src={flasterLogoImg}
                     alt="Flaster Logo"
@@ -243,10 +243,10 @@ export const Header: React.FC<HeaderProps> = ({
                   />
                 </div>
                 <div className="flex flex-col min-w-0 pointer-events-none">
-                  <span className="font-headline font-black text-lg sm:text-2xl tracking-tight text-[#1C1917] leading-none group-hover:text-[#DC2626] transition-colors">
+                  <span className="font-headline font-black text-lg sm:text-2xl tracking-tight text-[#6E8462] leading-none group-hover:text-[#9E1B28] transition-colors">
                     Flaster
                   </span>
-                  <span className="text-[10px] sm:text-xs font-extrabold text-[#DC2626] mt-0.5 leading-tight truncate">
+                  <span className="text-[10px] sm:text-xs font-extrabold text-[#9E1B28] mt-0.5 leading-tight truncate">
                     {t.brandSubtitle}
                   </span>
                 </div>

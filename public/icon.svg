@@ -1,12 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#DC2626" />
-      <stop offset="100%" stop-color="#991B1B" />
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="128" fill="url(#grad)" />
-  <!-- Flame & Leaf emblem -->
-  <path d="M256 96c0 0-48 72-48 128 0 35.3 21.5 65.6 52.3 78.4-1.5-7.8-2.3-15.8-2.3-24.1 0-49.7 34.3-91.4 80-102.3-4.7 66.2-44.4 121.2-102 144 2.8 1.3 5.8 2.3 8.9 3 41.5 10.3 83.7-14.7 94.3-56.1 4.5-17.7 2.1-36.2-6.9-52.9 29.8 28.5 47.7 68.3 47.7 112 0 88.4-71.6 160-160 160S96 415.4 96 327c0-76.8 54-141.1 126-156.4-1.3 7.8-2 15.8-2 23.9 0 46.1 27.2 85.8 66 103.5-18.7-27.2-30-60.3-30-96 0-38.3 12.8-73.6 34.5-101.9L256 96z" fill="#FEF3C7" />
-  <circle cx="256" cy="370" r="14" fill="#34D399" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#FFFDF7"/>
+  <!-- Top Crimson Red ribbon fold -->
+  <polygon points="214,96 368,96 312,164 214,164" fill="#9E1B28"/>
+  <polygon points="214,96 232,164 214,164" fill="#78121D"/>
+  <!-- Left & diagonal Vibrant Golden Yellow folded ribbon -->
+  <polygon points="146,164 214,96 214,248 146,284" fill="#F4C430"/>
+  <polygon points="214,248 368,96 368,164 214,248" fill="#F7CE3E"/>
+  <polygon points="214,248 368,96 322,188" fill="#DDA918"/>
+  <!-- Lower diagonal Crimson Red slash -->
+  <polygon points="146,298 320,200 214,308 146,364" fill="#9E1B28"/>
+  <!-- Sage Green arm & base fold -->
+  <polygon points="214,308 286,236 336,236 304,308" fill="#6E8462"/>
+  <polygon points="214,308 286,236 254,308" fill="#54684A"/>
+  <polygon points="146,364 214,308 214,424" fill="#6E8462"/>
+  <polygon points="146,364 214,308 214,334" fill="#54684A"/>
 </svg>

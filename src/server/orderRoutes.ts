@@ -22,10 +22,7 @@ import {
   timingSafeStringEqual,
 } from './adminAuth.ts';
 import { awardPurchaseReward, refundRedeemedPoints } from './loyaltyService.ts';
-import {
-  MIN_MERCHANT_ITEM_PRICE_AED,
-  MIN_MERCHANT_ITEM_PRICE_FILS,
-} from '../config/platformConfig.ts';
+import { MIN_MERCHANT_ITEM_PRICE_FILS } from '../config/platformConfig.ts';
 import { sendOrderConfirmationEmail } from './emailService.ts';
 import { recordOpsLog } from './opsService.ts';
 
@@ -207,7 +204,7 @@ router.post('/catalog', requireMerchantOrAdminAuth, (req, res) => {
   if (discountedFils < MIN_MERCHANT_ITEM_PRICE_FILS) {
     return res.status(400).json({
       success: false,
-      error: `الحد الأدنى لسعر الصنف هو ${MIN_MERCHANT_ITEM_PRICE_AED} درهماً إماراتياً (Minimum item price is ${MIN_MERCHANT_ITEM_PRICE_AED} AED).`,
+      error: 'يرجى إدخال سعر بيع صحيح أكبر من 0 درهم (Please enter a valid selling price greater than 0 AED).',
     });
   }
   const originalFils = Math.max(

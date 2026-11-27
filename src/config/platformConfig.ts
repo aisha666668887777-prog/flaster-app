@@ -37,9 +37,9 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   sequentialInvoiceCounter: 1001,
 };
 
-// Platform Pricing & Fee Rules (Authoritative & Immutable)
-export const MIN_MERCHANT_ITEM_PRICE_AED = 15;
-export const MIN_MERCHANT_ITEM_PRICE_FILS = 1500; // 15.00 AED minimum merchant listing price
+// Platform Pricing & Fee Rules
+export const MIN_MERCHANT_ITEM_PRICE_AED = 0.01;
+export const MIN_MERCHANT_ITEM_PRICE_FILS = 1; // Any positive price (> 0 AED) — full pricing freedom for merchants
 export const CUSTOMER_SERVICE_FEE_AED = 1.5;
 export const CUSTOMER_SERVICE_FEE_FILS = 150; // 1.50 AED automatic platform fee blended silently into customer price
 export const MIN_REDEMPTION_POINTS = 1000; // 1,000 points = 10.00 AED minimum redemption

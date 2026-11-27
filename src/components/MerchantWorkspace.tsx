@@ -372,8 +372,8 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
       category: item.category,
       imageUrl: item.imageUrl || '',
       stock: item.stock,
-      originalPrice: Math.max(MIN_MERCHANT_ITEM_PRICE_AED, item.originalPrice),
-      discountedPrice: Math.max(MIN_MERCHANT_ITEM_PRICE_AED, item.discountedPrice),
+      originalPrice: Math.max(0, item.originalPrice),
+      discountedPrice: Math.max(0, item.discountedPrice),
       pickupWindow: item.pickupWindow,
       expiryHours: 4,
       allergens: item.allergens ? item.allergens.join(', ') : '',
@@ -401,8 +401,8 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
     if (!Number.isFinite(formData.discountedPrice) || formData.discountedPrice < MIN_MERCHANT_ITEM_PRICE_AED) {
       setPriceValidationError(
         isArabic
-          ? `الحد الأدنى لسعر البيع الذي يمكن للتاجر إدخاله هو ${MIN_MERCHANT_ITEM_PRICE_AED} درهماً إماراتياً.`
-          : `Minimum selling price is ${MIN_MERCHANT_ITEM_PRICE_AED} AED.`
+          ? 'يرجى إدخال سعر بيع صحيح أكبر من 0 درهم.'
+          : 'Please enter a valid selling price greater than 0 AED.'
       );
       return;
     }
@@ -1009,8 +1009,8 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
                 </h4>
                 <p className="text-xs text-[#78716C] max-w-md mx-auto">
                   {isArabic
-                    ? 'ارفع صورة حقيقية لصنف الطعام، حدد السعر (بحد أدنى 15 درهم) والكمية ووقت الاستلام ليظهر للزبائن فوراً.'
-                    : 'Upload a real photo of your dish, set the price (minimum 15 AED), stock, and pickup window to go live immediately.'}
+                    ? 'ارفع صورة حقيقية لصنف الطعام، حدد السعر الذي يناسبك والكمية ووقت الاستلام ليظهر للزبائن فوراً.'
+                    : 'Upload a real photo of your dish, set your preferred price, stock, and pickup window to go live immediately.'}
                 </p>
               </div>
               <button
@@ -1912,7 +1912,7 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
                   </div>
                 </div>
 
-                {/* 5. Pricing: Regular vs Surplus Rescue Price (Minimum 15 AED + Automatic 1.50 AED Customer Service Fee) */}
+                {/* 5. Pricing: Regular vs Surplus Rescue Price (Any Positive Price + Automatic 1.50 AED Customer Service Fee) */}
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
@@ -1922,8 +1922,8 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
                       <div className="relative">
                         <input
                           type="number"
-                          min={MIN_MERCHANT_ITEM_PRICE_AED}
-                          step="0.5"
+                          min="0.01"
+                          step="any"
                           required
                           value={formData.originalPrice}
                           onChange={(e) => setFormData({ ...formData, originalPrice: parseFloat(e.target.value) || 0 })}
@@ -1935,13 +1935,13 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
 
                     <div>
                       <label className="block font-semibold text-[#1C1917] mb-1.5">
-                        {t.rescuePriceAed} ({isArabic ? `الحد الأدنى ${MIN_MERCHANT_ITEM_PRICE_AED} درهم` : `Min ${MIN_MERCHANT_ITEM_PRICE_AED} AED`}) *
+                        {t.rescuePriceAed} *
                       </label>
                       <div className="relative">
                         <input
                           type="number"
-                          min={MIN_MERCHANT_ITEM_PRICE_AED}
-                          step="0.5"
+                          min="0.01"
+                          step="any"
                           required
                           value={formData.discountedPrice}
                           onChange={(e) => {
@@ -1964,8 +1964,8 @@ export const MerchantWorkspace: React.FC<MerchantWorkspaceProps> = ({
                           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                           <span>
                             {isArabic
-                              ? `الحد الأدنى المسموح به للسعر هو ${MIN_MERCHANT_ITEM_PRICE_AED} درهم`
-                              : `Minimum allowed price is ${MIN_MERCHANT_ITEM_PRICE_AED} AED`}
+                              ? 'يرجى إدخال سعر أكبر من 0 درهم'
+                              : 'Please enter a price greater than 0 AED'}
                           </span>
                         </p>
                       ) : formData.originalPrice > formData.discountedPrice ? (

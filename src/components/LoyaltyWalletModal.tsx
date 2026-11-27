@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Coins,
@@ -183,18 +183,25 @@ export const LoyaltyWalletModal: React.FC<LoyaltyWalletModalProps> = ({
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewMessage, setReviewMessage] = useState<string | null>(null);
 
-  // Live Firestore + localStorage + backend hydration whenever modal opens or user changes
-  useEffect(() => {
-    if (!isOpen) return;
+  const onPointsUpdatedRef = useRef(onPointsUpdated);
+  onPointsUpdatedRef.current = onPointsUpdated;
 
-    if (!canPersistUser) {
-      setWallet((prev) => ({
+  // Keep guest wallet points synced without tearing down Firestore subscriptions
+  useEffect(() => {
+    if (!isOpen || canPersistUser) return;
+    setWallet((prev) => {
+      if (prev.availablePoints === currentPoints) return prev;
+      return {
         ...prev,
         availablePoints: currentPoints,
         equivalentAed: Number((currentPoints / 100).toFixed(2)),
-      }));
-      return;
-    }
+      };
+    });
+  }, [isOpen, canPersistUser, currentPoints]);
+
+  // Live Firestore + localStorage + backend hydration whenever modal opens or user changes
+  useEffect(() => {
+    if (!isOpen || !canPersistUser) return;
 
     const cached = loadCachedWallet(customerId);
     if (cached) {
@@ -235,7 +242,7 @@ export const LoyaltyWalletModal: React.FC<LoyaltyWalletModalProps> = ({
         nextExpirationDate: liveWallet.nextExpirationDate,
         daysUntilExpiry: daysLeft,
       });
-      onPointsUpdated?.(liveWallet.availablePoints);
+      onPointsUpdatedRef.current?.(liveWallet.availablePoints);
     });
 
     const unsubTxns = subscribeToCustomerLoyaltyTransactions(customerId, (liveTxns) => {
@@ -314,7 +321,7 @@ export const LoyaltyWalletModal: React.FC<LoyaltyWalletModalProps> = ({
       unsubTxns();
       unsubClaims();
     };
-  }, [isOpen, customerId, canPersistUser, currentPoints, onPointsUpdated]);
+  }, [isOpen, customerId, canPersistUser]);
 
   const persistWalletAndTransaction = async (
     nextWalletState: WalletViewState,

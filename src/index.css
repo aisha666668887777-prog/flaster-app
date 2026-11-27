@@ -8,6 +8,22 @@
     --font-condensed: 'Bebas Neue', 'Plus Jakarta Sans', sans-serif;
     --font-metric: 'Space Grotesk', monospace;
     --font-arabic: 'Cairo', system-ui, -apple-system, sans-serif;
+
+    /* Flaster Brand Identity Palette (Crimson Red + Sage Green + Vibrant Golden Yellow) */
+    --flaster-crimson: #9E1B28;
+    --flaster-crimson-dark: #78121D;
+    --flaster-crimson-soft: #FDF2F3;
+    --flaster-sage: #6E8462;
+    --flaster-sage-dark: #4F6345;
+    --flaster-sage-soft: #EFF4EC;
+    --flaster-yellow: #F4C430;
+    --flaster-yellow-bright: #F7CE3E;
+    --flaster-yellow-deep: #C9960C;
+    --flaster-yellow-soft: #FEF9E1;
+    --flaster-yellow-ink: #3B2800;
+    --flaster-canvas: #FAF8F2;
+    --flaster-surface: #FFFDF9;
+    --flaster-border: #E8E3D8;
   }
 
   [dir="rtl"] {
@@ -19,6 +35,27 @@
     font-family: var(--font-body);
   }
 }
+
+/* Flaster Unified Brand Color Harmonization */
+.bg-\[\#DC2626\] { background-color: var(--flaster-crimson); }
+.text-\[\#DC2626\] { color: var(--flaster-crimson); }
+.border-\[\#DC2626\] { border-color: var(--flaster-crimson); }
+.hover\:bg-\[\#B91C1C\]:hover { background-color: var(--flaster-crimson-dark); }
+.hover\:text-\[\#DC2626\]:hover { color: var(--flaster-crimson); }
+.focus\:border-\[\#DC2626\]:focus { border-color: var(--flaster-crimson); }
+
+.bg-\[\#059669\] { background-color: var(--flaster-sage); }
+.text-\[\#059669\] { color: var(--flaster-sage-dark); }
+.hover\:bg-\[\#047857\]:hover { background-color: var(--flaster-sage-dark); }
+
+.bg-amber-400 { background-color: var(--flaster-yellow); color: var(--flaster-yellow-ink); }
+.bg-amber-300 { background-color: var(--flaster-yellow-bright); color: var(--flaster-yellow-ink); }
+.bg-amber-500, .bg-amber-600 { background-color: var(--flaster-yellow-deep); }
+.bg-amber-50 { background-color: var(--flaster-yellow-soft); }
+.border-amber-300, .border-amber-400 { border-color: #E8C75A; }
+
+.bg-\[\#FAF7F2\] { background-color: var(--flaster-canvas); }
+.border-\[\#EAE4DC\] { border-color: var(--flaster-border); }
 
 .font-headline {
   font-family: var(--font-headline);

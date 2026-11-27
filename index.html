@@ -1,6 +1,14 @@
 <!doctype html>
 <html lang="ar" dir="rtl" class="max-w-full w-full">
   <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-J38SD2XS3F"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-J38SD2XS3F');
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="google-site-verification" content="_NxtvXy2N144Pku0U_L6kINRt5qOQHt13OHrfMo5jA0" />
@@ -10,7 +18,7 @@
     <link rel="canonical" href="https://flaster.ae/" />
     
     <!-- Theme & Mobile Web App Meta Tags (iOS Safari & Android Chrome) -->
-    <meta name="theme-color" content="#FFFDF9" />
+    <meta name="theme-color" content="#9E1B28" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -18,13 +26,14 @@
     <meta name="application-name" content="Flaster" />
     <meta name="format-detection" content="telephone=no" />
     
-    <!-- iOS & Browser Icons (Official Flaster Logo) -->
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2" />
-    <link rel="apple-touch-icon" sizes="192x192" href="/pwa-192x192.png?v=2" />
-    <link rel="apple-touch-icon" sizes="512x512" href="/pwa-512x512.png?v=2" />
-    <link rel="icon" type="image/jpeg" href="/flaster-app-icon.jpg?v=2" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png?v=2" />
+    <!-- iOS & Browser Icons (Official Flaster Logo v3) -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/pwa-192x192.png?v=3" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/pwa-512x512.png?v=3" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg?v=3" />
+    <link rel="icon" type="image/jpeg" href="/flaster-app-icon.jpg?v=3" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png?v=3" />
 
     <!-- OpenGraph Social Cards -->
     <meta property="og:site_name" content="فلاستر | Flaster" />
@@ -74,14 +83,6 @@
       iframe[src*="aistudio"], div[class*="aistudio"], div[id*="aistudio"], a[href*="aistudio"] {
         display: none !important;
       }
-
-      /* Red Velvet / Cake Palette (#B91D2D, #5C0101, #FFA29D, #FBF4D0, #E5C48D) */
-      .bg-\[\#DC2626\], [class*="bg-[#DC2626]"] { background-color: #B91D2D !important; }
-      .text-\[\#DC2626\], [class*="text-[#DC2626]"] { color: #B91D2D !important; }
-      .border-\[\#DC2626\], [class*="border-[#DC2626]"] { border-color: #B91D2D !important; }
-      .hover\:bg-\[\#B91C1C\]:hover, [class*="hover:bg-[#B91C1C]"]:hover { background-color: #5C0101 !important; }
-      .bg-amber-400, .bg-amber-500, .bg-amber-600 { background-color: #FFA29D !important; border-color: #e08b87 !important; color: #5C0101 !important; }
-      .bg-\[\#FAF7F2\] { background-color: #FBF4D0 !important; }
     </style>
     <script>
       // Automatically strip out any floating AI Studio watermarks or preview badges
@@ -98,7 +99,7 @@
       });
     </script>
   </head>
-  <body class="bg-[#FAF7F2] text-[#1C1917] antialiased selection:bg-[#DC2626] selection:text-white max-w-full w-full">
+  <body class="bg-[#FAF8F2] text-[#1C1917] antialiased selection:bg-[#9E1B28] selection:text-white max-w-full w-full">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

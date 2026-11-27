@@ -40,11 +40,11 @@ export const PWAUpdateBanner: React.FC<PWAUpdateBannerProps> = ({ lang }) => {
       dir={isAr ? 'rtl' : 'ltr'}
       className="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:end-4 z-[9999] max-w-md mx-auto sm:mx-0"
     >
-      <div className="bg-[#1C1917] text-white rounded-2xl shadow-2xl border border-white/10 px-4 py-3.5 flex items-center justify-between gap-3">
+      <div className="bg-[#1C1917] text-white rounded-2xl shadow-2xl border border-[#F4C430]/30 px-4 py-3.5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-[#B91D2D] flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-[#9E1B28] flex items-center justify-center shrink-0">
             <RefreshCw
-              className={`w-4 h-4 text-white ${pwaState.isUpdating ? 'animate-spin' : ''}`}
+              className={`w-4 h-4 text-[#F4C430] ${pwaState.isUpdating ? 'animate-spin' : ''}`}
             />
           </div>
           <div className="min-w-0">
@@ -64,7 +64,7 @@ export const PWAUpdateBanner: React.FC<PWAUpdateBannerProps> = ({ lang }) => {
             type="button"
             disabled={pwaState.isUpdating}
             onClick={() => void applyPwaUpdateNow()}
-            className="px-3.5 py-2 rounded-xl bg-[#B91D2D] hover:bg-[#991522] disabled:opacity-60 text-white text-xs font-bold transition-colors cursor-pointer whitespace-nowrap"
+            className="px-3.5 py-2 rounded-xl bg-[#F4C430] hover:bg-[#E5B520] disabled:opacity-60 text-[#2D2200] text-xs font-extrabold transition-colors cursor-pointer whitespace-nowrap"
           >
             {pwaState.isUpdating
               ? isAr

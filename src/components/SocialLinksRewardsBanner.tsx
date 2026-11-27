@@ -15,10 +15,10 @@ export const SocialLinksRewardsBanner: React.FC<SocialLinksRewardsBannerProps> =
   const isArabic = lang === 'ar';
 
   return (
-    <section className="bg-[#FFFDF9] rounded-2xl border border-[#EAE4DC] p-4 sm:p-5 shadow-xs">
+    <section className="bg-[#FFFDF9] rounded-2xl border border-[#E8E3D8] p-4 sm:p-5 shadow-xs">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
-          <p className="text-xs font-bold text-[#DC2626]">
+          <p className="text-xs font-extrabold text-[#6E8462]">
             {isArabic ? 'صفحات فلاستر الرسمية' : 'Official Flaster Channels'}
           </p>
           <h2 className="font-headline font-extrabold text-base sm:text-lg text-[#1C1917]">
@@ -38,9 +38,9 @@ export const SocialLinksRewardsBanner: React.FC<SocialLinksRewardsBannerProps> =
             <button
               type="button"
               onClick={onOpenLoyalty}
-              className="h-10 px-4 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-950 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap"
+              className="h-10 px-4 rounded-xl bg-[#F4C430] hover:bg-[#E5B520] border border-[#D4A017]/50 text-[#2D2200] font-extrabold text-xs flex items-center gap-2 shadow-xs transition-colors cursor-pointer whitespace-nowrap"
             >
-              <Coins className="w-4 h-4 text-amber-600" />
+              <Coins className="w-4 h-4 text-[#9E1B28]" />
               <span>{isArabic ? 'نقاطي ومكافآت المتابعة (+5 نقاط)' : 'My Points & Follow Rewards (+5 pts)'}</span>
             </button>
           )}
@@ -49,7 +49,7 @@ export const SocialLinksRewardsBanner: React.FC<SocialLinksRewardsBannerProps> =
             href={SOCIAL_LINKTREE_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="h-10 px-4 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors whitespace-nowrap"
+            className="h-10 px-4 rounded-xl bg-[#9E1B28] hover:bg-[#78121D] text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors whitespace-nowrap"
           >
             <Share2 className="w-4 h-4" />
             <span dir="ltr">linktr.ee/flaster</span>

@@ -95,7 +95,7 @@ import {
   Clock
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import flasterLogoImg from './assets/images/flaster_brand_logo_1794321576013.jpg';
+import flasterLogoImg from './assets/images/flaster_new_icon_1795639863426.jpg';
 
 export default function App() {
   const { currentUser, signOut } = useAuth();
@@ -247,18 +247,20 @@ export default function App() {
 
       if (!authenticatedMerchant || authenticatedMerchant.merchantId === 'merchant-master' || !currentExists) {
         const firstStore = merchantPartners[0];
-        setAuthenticatedMerchant({
-          merchantId: firstStore.id,
-          username: firstStore.username || firstStore.id.replace(/^merchant-/, ''),
-          name: firstStore.name,
-          nameAr: firstStore.nameAr,
-          phone: firstStore.phone || '+971500000000',
-          disabled: Boolean(firstStore.disabled),
-          failedAttempts: 0,
-          lockedUntil: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
+        if (!authenticatedMerchant || authenticatedMerchant.merchantId !== firstStore.id) {
+          setAuthenticatedMerchant({
+            merchantId: firstStore.id,
+            username: firstStore.username || firstStore.id.replace(/^merchant-/, ''),
+            name: firstStore.name,
+            nameAr: firstStore.nameAr,
+            phone: firstStore.phone || '+971500000000',
+            disabled: Boolean(firstStore.disabled),
+            failedAttempts: 0,
+            lockedUntil: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
       } else if (
         currentExists.name !== authenticatedMerchant.name ||
         currentExists.nameAr !== authenticatedMerchant.nameAr ||
@@ -483,6 +485,13 @@ export default function App() {
       unsubscribeWallet();
     };
   }, [currentUser, customerProfile?.id, customerProfile?.name]);
+
+  const handleLoyaltyPointsUpdated = React.useCallback((newPts: number) => {
+    setLoyaltyPoints((prev) => (prev === newPts ? prev : newPts));
+    setCustomerProfile((prev) =>
+      prev && prev.loyaltyPoints !== newPts ? { ...prev, loyaltyPoints: newPts } : prev
+    );
+  }, []);
 
   // Helper to apply and persist any loyalty points delta (order earn / redeem / refund) to Firestore + localStorage
   const persistLoyaltyPointsDelta = (
@@ -1784,7 +1793,7 @@ export default function App() {
                 </p>
               </div>
 
-              <span className="font-metric text-xs font-semibold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 shadow-sm">
+              <span className="font-metric text-xs font-semibold text-[#4F6345] bg-[#EFF4EC] px-3 py-1.5 rounded-lg border border-[#6E8462]/30 shadow-2xs">
                 {filteredItems.length} {lang === 'ar' ? 'صنف متوفر' : 'items available'}
               </span>
             </div>
@@ -1855,7 +1864,7 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
               
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-red-50 text-[#ee5253] border border-red-200 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-[#FDF2F3] text-[#9E1B28] border border-[#9E1B28]/25 flex items-center justify-center shrink-0">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
@@ -1869,11 +1878,11 @@ export default function App() {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#059669] border border-emerald-200 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-[#EFF4EC] text-[#4F6345] border border-[#6E8462]/30 flex items-center justify-center shrink-0">
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-headline font-bold text-sm text-[#0F172A]">
+                  <h4 className="font-headline font-bold text-sm text-[#1C1917]">
                     {t.valueBox2Title}
                   </h4>
                   <p className="text-[#64748B] text-[11px] mt-0.5 leading-relaxed">
@@ -1883,11 +1892,11 @@ export default function App() {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-100/80 text-amber-800 border border-amber-300 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-[#FEF9E1] text-[#854D0E] border border-[#F4C430] flex items-center justify-center shrink-0">
                   <Clock className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-headline font-bold text-sm text-[#0F172A]">
+                  <h4 className="font-headline font-bold text-sm text-[#1C1917]">
                     {t.valueBox3Title}
                   </h4>
                   <p className="text-[#64748B] text-[11px] mt-0.5 leading-relaxed">
@@ -1977,10 +1986,7 @@ export default function App() {
           setIsLoyaltyOpen(false);
           setIsCustomerAuthOpen(true);
         }}
-        onPointsUpdated={(newPts) => {
-          setLoyaltyPoints(newPts);
-          setCustomerProfile((prev) => (prev ? { ...prev, loyaltyPoints: newPts } : prev));
-        }}
+        onPointsUpdated={handleLoyaltyPointsUpdated}
       />
 
       <ImpactModal

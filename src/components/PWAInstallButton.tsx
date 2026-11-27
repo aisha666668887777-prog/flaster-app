@@ -15,7 +15,7 @@ import {
 import { usePWAInstall, useOnlineStatus } from '../hooks/usePWAInstall';
 import { Language } from '../types';
 import { translations } from '../translations';
-import flasterLogoImg from '../assets/images/flaster_brand_logo_1794321576013.jpg';
+import flasterLogoImg from '../assets/images/flaster_new_icon_1795639863426.jpg';
 
 interface PWAInstallButtonProps {
   lang: Language;
